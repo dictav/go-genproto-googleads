@@ -25,7 +25,6 @@ import (
 
 	"cloud.google.com/go/longrunning"
 	lroauto "cloud.google.com/go/longrunning/autogen"
-	"github.com/golang/protobuf/proto"
 	gax "github.com/googleapis/gax-go/v2"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -38,6 +37,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/proto"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -54,12 +54,13 @@ type CampaignExperimentCallOptions struct {
 	ListCampaignExperimentAsyncErrors []gax.CallOption
 }
 
-func defaultCampaignExperimentClientOptions() []option.ClientOption {
+func defaultCampaignExperimentGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -155,32 +156,24 @@ func defaultCampaignExperimentCallOptions() *CampaignExperimentCallOptions {
 	}
 }
 
-// CampaignExperimentClient is a client for interacting with Google Ads API.
-//
-// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type CampaignExperimentClient struct {
-	// Connection pool of gRPC connections to the service.
-	connPool gtransport.ConnPool
-
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
-	// The gRPC API client.
-	campaignExperimentClient servicespb.CampaignExperimentServiceClient
-
-	// LROClient is used internally to handle longrunning operations.
-	// It is exposed so that its CallOptions can be modified if required.
-	// Users should not Close this client.
-	LROClient *lroauto.OperationsClient
-
-	// The call options for this service.
-	CallOptions *CampaignExperimentCallOptions
-
-	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
+// internalCampaignExperimentClient is an interface that defines the methods availaible from Google Ads API.
+type internalCampaignExperimentClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetCampaignExperiment(context.Context, *servicespb.GetCampaignExperimentRequest, ...gax.CallOption) (*resourcespb.CampaignExperiment, error)
+	CreateCampaignExperiment(context.Context, *servicespb.CreateCampaignExperimentRequest, ...gax.CallOption) (*CreateCampaignExperimentOperation, error)
+	CreateCampaignExperimentOperation(name string) *CreateCampaignExperimentOperation
+	MutateCampaignExperiments(context.Context, *servicespb.MutateCampaignExperimentsRequest, ...gax.CallOption) (*servicespb.MutateCampaignExperimentsResponse, error)
+	GraduateCampaignExperiment(context.Context, *servicespb.GraduateCampaignExperimentRequest, ...gax.CallOption) (*servicespb.GraduateCampaignExperimentResponse, error)
+	PromoteCampaignExperiment(context.Context, *servicespb.PromoteCampaignExperimentRequest, ...gax.CallOption) (*PromoteCampaignExperimentOperation, error)
+	PromoteCampaignExperimentOperation(name string) *PromoteCampaignExperimentOperation
+	EndCampaignExperiment(context.Context, *servicespb.EndCampaignExperimentRequest, ...gax.CallOption) error
+	ListCampaignExperimentAsyncErrors(context.Context, *servicespb.ListCampaignExperimentAsyncErrorsRequest, ...gax.CallOption) *StatusIterator
 }
 
-// NewCampaignExperimentClient creates a new campaign experiment service client.
+// CampaignExperimentClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
 //
 // CampaignExperimentService manages the life cycle of campaign experiments.
 // It is used to create new experiments from drafts, modify experiment
@@ -192,68 +185,39 @@ type CampaignExperimentClient struct {
 // experiment campaign, directing a fixed share of traffic to each arm.
 // A campaign experiment is created from a draft of changes to the base campaign
 // and will be a snapshot of changes in the draft at the time of creation.
-func NewCampaignExperimentClient(ctx context.Context, opts ...option.ClientOption) (*CampaignExperimentClient, error) {
-	clientOpts := defaultCampaignExperimentClientOptions()
+type CampaignExperimentClient struct {
+	// The internal transport-dependent client.
+	internalClient internalCampaignExperimentClient
 
-	if newCampaignExperimentClientHook != nil {
-		hookOpts, err := newCampaignExperimentClientHook(ctx, clientHookParams{})
-		if err != nil {
-			return nil, err
-		}
-		clientOpts = append(clientOpts, hookOpts...)
-	}
+	// The call options for this service.
+	CallOptions *CampaignExperimentCallOptions
 
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
-	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
-	if err != nil {
-		return nil, err
-	}
-	c := &CampaignExperimentClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultCampaignExperimentCallOptions(),
-
-		campaignExperimentClient: servicespb.NewCampaignExperimentServiceClient(connPool),
-	}
-	c.setGoogleClientInfo()
-
-	c.LROClient, err = lroauto.NewOperationsClient(ctx, gtransport.WithConnPool(connPool))
-	if err != nil {
-		// This error "should not happen", since we are just reusing old connection pool
-		// and never actually need to dial.
-		// If this does happen, we could leak connp. However, we cannot close conn:
-		// If the user invoked the constructor with option.WithGRPCConn,
-		// we would close a connection that's still in use.
-		// TODO: investigate error conditions.
-		return nil, err
-	}
-	return c, nil
+	// LROClient is used internally to handle long-running operations.
+	// It is exposed so that its CallOptions can be modified if required.
+	// Users should not Close this client.
+	LROClient *lroauto.OperationsClient
 }
 
-// Connection returns a connection to the API service.
-//
-// Deprecated.
-func (c *CampaignExperimentClient) Connection() *grpc.ClientConn {
-	return c.connPool.Conn()
-}
+// Wrapper methods routed to the internal client.
 
 // Close closes the connection to the API service. The user should invoke this when
 // the client is no longer required.
 func (c *CampaignExperimentClient) Close() error {
-	return c.connPool.Close()
+	return c.internalClient.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *CampaignExperimentClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *CampaignExperimentClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
 }
 
 // GetCampaignExperiment returns the requested campaign experiment in full detail.
@@ -266,24 +230,7 @@ func (c *CampaignExperimentClient) setGoogleClientInfo(keyval ...string) {
 // QuotaError (at )
 // RequestError (at )
 func (c *CampaignExperimentClient) GetCampaignExperiment(ctx context.Context, req *servicespb.GetCampaignExperimentRequest, opts ...gax.CallOption) (*resourcespb.CampaignExperiment, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetCampaignExperiment[0:len(c.CallOptions.GetCampaignExperiment):len(c.CallOptions.GetCampaignExperiment)], opts...)
-	var resp *resourcespb.CampaignExperiment
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.campaignExperimentClient.GetCampaignExperiment(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.GetCampaignExperiment(ctx, req, opts...)
 }
 
 // CreateCampaignExperiment creates a campaign experiment based on a campaign draft. The draft campaign
@@ -311,26 +258,13 @@ func (c *CampaignExperimentClient) GetCampaignExperiment(ctx context.Context, re
 // RangeError (at )
 // RequestError (at )
 func (c *CampaignExperimentClient) CreateCampaignExperiment(ctx context.Context, req *servicespb.CreateCampaignExperimentRequest, opts ...gax.CallOption) (*CreateCampaignExperimentOperation, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.CreateCampaignExperiment[0:len(c.CallOptions.CreateCampaignExperiment):len(c.CallOptions.CreateCampaignExperiment)], opts...)
-	var resp *longrunningpb.Operation
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.campaignExperimentClient.CreateCampaignExperiment(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return &CreateCampaignExperimentOperation{
-		lro: longrunning.InternalNewOperation(c.LROClient, resp),
-	}, nil
+	return c.internalClient.CreateCampaignExperiment(ctx, req, opts...)
+}
+
+// CreateCampaignExperimentOperation returns a new CreateCampaignExperimentOperation from a given name.
+// The name must be that of a previously created CreateCampaignExperimentOperation, possibly from a different process.
+func (c *CampaignExperimentClient) CreateCampaignExperimentOperation(name string) *CreateCampaignExperimentOperation {
+	return c.internalClient.CreateCampaignExperimentOperation(name)
 }
 
 // MutateCampaignExperiments updates campaign experiments. Operation statuses are returned.
@@ -344,24 +278,7 @@ func (c *CampaignExperimentClient) CreateCampaignExperiment(ctx context.Context,
 // QuotaError (at )
 // RequestError (at )
 func (c *CampaignExperimentClient) MutateCampaignExperiments(ctx context.Context, req *servicespb.MutateCampaignExperimentsRequest, opts ...gax.CallOption) (*servicespb.MutateCampaignExperimentsResponse, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateCampaignExperiments[0:len(c.CallOptions.MutateCampaignExperiments):len(c.CallOptions.MutateCampaignExperiments)], opts...)
-	var resp *servicespb.MutateCampaignExperimentsResponse
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.campaignExperimentClient.MutateCampaignExperiments(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.MutateCampaignExperiments(ctx, req, opts...)
 }
 
 // GraduateCampaignExperiment graduates a campaign experiment to a full campaign. The base and experiment
@@ -377,24 +294,7 @@ func (c *CampaignExperimentClient) MutateCampaignExperiments(ctx context.Context
 // QuotaError (at )
 // RequestError (at )
 func (c *CampaignExperimentClient) GraduateCampaignExperiment(ctx context.Context, req *servicespb.GraduateCampaignExperimentRequest, opts ...gax.CallOption) (*servicespb.GraduateCampaignExperimentResponse, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "campaign_experiment", url.QueryEscape(req.GetCampaignExperiment())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GraduateCampaignExperiment[0:len(c.CallOptions.GraduateCampaignExperiment):len(c.CallOptions.GraduateCampaignExperiment)], opts...)
-	var resp *servicespb.GraduateCampaignExperimentResponse
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.campaignExperimentClient.GraduateCampaignExperiment(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.GraduateCampaignExperiment(ctx, req, opts...)
 }
 
 // PromoteCampaignExperiment promotes the changes in a experiment campaign back to the base campaign.
@@ -412,26 +312,13 @@ func (c *CampaignExperimentClient) GraduateCampaignExperiment(ctx context.Contex
 // QuotaError (at )
 // RequestError (at )
 func (c *CampaignExperimentClient) PromoteCampaignExperiment(ctx context.Context, req *servicespb.PromoteCampaignExperimentRequest, opts ...gax.CallOption) (*PromoteCampaignExperimentOperation, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "campaign_experiment", url.QueryEscape(req.GetCampaignExperiment())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.PromoteCampaignExperiment[0:len(c.CallOptions.PromoteCampaignExperiment):len(c.CallOptions.PromoteCampaignExperiment)], opts...)
-	var resp *longrunningpb.Operation
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.campaignExperimentClient.PromoteCampaignExperiment(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return &PromoteCampaignExperimentOperation{
-		lro: longrunning.InternalNewOperation(c.LROClient, resp),
-	}, nil
+	return c.internalClient.PromoteCampaignExperiment(ctx, req, opts...)
+}
+
+// PromoteCampaignExperimentOperation returns a new PromoteCampaignExperimentOperation from a given name.
+// The name must be that of a previously created PromoteCampaignExperimentOperation, possibly from a different process.
+func (c *CampaignExperimentClient) PromoteCampaignExperimentOperation(name string) *PromoteCampaignExperimentOperation {
+	return c.internalClient.PromoteCampaignExperimentOperation(name)
 }
 
 // EndCampaignExperiment immediately ends a campaign experiment, changing the experiment’s scheduled
@@ -447,20 +334,7 @@ func (c *CampaignExperimentClient) PromoteCampaignExperiment(ctx context.Context
 // QuotaError (at )
 // RequestError (at )
 func (c *CampaignExperimentClient) EndCampaignExperiment(ctx context.Context, req *servicespb.EndCampaignExperimentRequest, opts ...gax.CallOption) error {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "campaign_experiment", url.QueryEscape(req.GetCampaignExperiment())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.EndCampaignExperiment[0:len(c.CallOptions.EndCampaignExperiment):len(c.CallOptions.EndCampaignExperiment)], opts...)
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		_, err = c.campaignExperimentClient.EndCampaignExperiment(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	return err
+	return c.internalClient.EndCampaignExperiment(ctx, req, opts...)
 }
 
 // ListCampaignExperimentAsyncErrors returns all errors that occurred during CampaignExperiment create or
@@ -475,9 +349,244 @@ func (c *CampaignExperimentClient) EndCampaignExperiment(ctx context.Context, re
 // QuotaError (at )
 // RequestError (at )
 func (c *CampaignExperimentClient) ListCampaignExperimentAsyncErrors(ctx context.Context, req *servicespb.ListCampaignExperimentAsyncErrorsRequest, opts ...gax.CallOption) *StatusIterator {
+	return c.internalClient.ListCampaignExperimentAsyncErrors(ctx, req, opts...)
+}
+
+// campaignExperimentGRPCClient is a client for interacting with Google Ads API over gRPC transport.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+type campaignExperimentGRPCClient struct {
+	// Connection pool of gRPC connections to the service.
+	connPool gtransport.ConnPool
+
+	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
+	disableDeadlines bool
+
+	// Points back to the CallOptions field of the containing CampaignExperimentClient
+	CallOptions **CampaignExperimentCallOptions
+
+	// The gRPC API client.
+	campaignExperimentClient servicespb.CampaignExperimentServiceClient
+
+	// LROClient is used internally to handle long-running operations.
+	// It is exposed so that its CallOptions can be modified if required.
+	// Users should not Close this client.
+	LROClient **lroauto.OperationsClient
+
+	// The x-goog-* metadata to be sent with each request.
+	xGoogMetadata metadata.MD
+}
+
+// NewCampaignExperimentClient creates a new campaign experiment service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
+//
+// CampaignExperimentService manages the life cycle of campaign experiments.
+// It is used to create new experiments from drafts, modify experiment
+// properties, promote changes in an experiment back to its base campaign,
+// graduate experiments into new stand-alone campaigns, and to remove an
+// experiment.
+//
+// An experiment consists of two variants or arms - the base campaign and the
+// experiment campaign, directing a fixed share of traffic to each arm.
+// A campaign experiment is created from a draft of changes to the base campaign
+// and will be a snapshot of changes in the draft at the time of creation.
+func NewCampaignExperimentClient(ctx context.Context, opts ...option.ClientOption) (*CampaignExperimentClient, error) {
+	clientOpts := defaultCampaignExperimentGRPCClientOptions()
+	if newCampaignExperimentClientHook != nil {
+		hookOpts, err := newCampaignExperimentClientHook(ctx, clientHookParams{})
+		if err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, hookOpts...)
+	}
+
+	disableDeadlines, err := checkDisableDeadlines()
+	if err != nil {
+		return nil, err
+	}
+
+	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
+	if err != nil {
+		return nil, err
+	}
+	client := CampaignExperimentClient{CallOptions: defaultCampaignExperimentCallOptions()}
+
+	c := &campaignExperimentGRPCClient{
+		connPool:                 connPool,
+		disableDeadlines:         disableDeadlines,
+		campaignExperimentClient: servicespb.NewCampaignExperimentServiceClient(connPool),
+		CallOptions:              &client.CallOptions,
+	}
+	c.setGoogleClientInfo()
+
+	client.internalClient = c
+
+	client.LROClient, err = lroauto.NewOperationsClient(ctx, gtransport.WithConnPool(connPool))
+	if err != nil {
+		// This error "should not happen", since we are just reusing old connection pool
+		// and never actually need to dial.
+		// If this does happen, we could leak connp. However, we cannot close conn:
+		// If the user invoked the constructor with option.WithGRPCConn,
+		// we would close a connection that's still in use.
+		// TODO: investigate error conditions.
+		return nil, err
+	}
+	c.LROClient = &client.LROClient
+	return &client, nil
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *campaignExperimentGRPCClient) Connection() *grpc.ClientConn {
+	return c.connPool.Conn()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *campaignExperimentGRPCClient) setGoogleClientInfo(keyval ...string) {
+	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+}
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *campaignExperimentGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *campaignExperimentGRPCClient) GetCampaignExperiment(ctx context.Context, req *servicespb.GetCampaignExperimentRequest, opts ...gax.CallOption) (*resourcespb.CampaignExperiment, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.ListCampaignExperimentAsyncErrors[0:len(c.CallOptions.ListCampaignExperimentAsyncErrors):len(c.CallOptions.ListCampaignExperimentAsyncErrors)], opts...)
+	opts = append((*c.CallOptions).GetCampaignExperiment[0:len((*c.CallOptions).GetCampaignExperiment):len((*c.CallOptions).GetCampaignExperiment)], opts...)
+	var resp *resourcespb.CampaignExperiment
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.campaignExperimentClient.GetCampaignExperiment(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *campaignExperimentGRPCClient) CreateCampaignExperiment(ctx context.Context, req *servicespb.CreateCampaignExperimentRequest, opts ...gax.CallOption) (*CreateCampaignExperimentOperation, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).CreateCampaignExperiment[0:len((*c.CallOptions).CreateCampaignExperiment):len((*c.CallOptions).CreateCampaignExperiment)], opts...)
+	var resp *longrunningpb.Operation
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.campaignExperimentClient.CreateCampaignExperiment(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &CreateCampaignExperimentOperation{
+		lro: longrunning.InternalNewOperation(*c.LROClient, resp),
+	}, nil
+}
+
+func (c *campaignExperimentGRPCClient) MutateCampaignExperiments(ctx context.Context, req *servicespb.MutateCampaignExperimentsRequest, opts ...gax.CallOption) (*servicespb.MutateCampaignExperimentsResponse, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).MutateCampaignExperiments[0:len((*c.CallOptions).MutateCampaignExperiments):len((*c.CallOptions).MutateCampaignExperiments)], opts...)
+	var resp *servicespb.MutateCampaignExperimentsResponse
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.campaignExperimentClient.MutateCampaignExperiments(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *campaignExperimentGRPCClient) GraduateCampaignExperiment(ctx context.Context, req *servicespb.GraduateCampaignExperimentRequest, opts ...gax.CallOption) (*servicespb.GraduateCampaignExperimentResponse, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "campaign_experiment", url.QueryEscape(req.GetCampaignExperiment())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).GraduateCampaignExperiment[0:len((*c.CallOptions).GraduateCampaignExperiment):len((*c.CallOptions).GraduateCampaignExperiment)], opts...)
+	var resp *servicespb.GraduateCampaignExperimentResponse
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.campaignExperimentClient.GraduateCampaignExperiment(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *campaignExperimentGRPCClient) PromoteCampaignExperiment(ctx context.Context, req *servicespb.PromoteCampaignExperimentRequest, opts ...gax.CallOption) (*PromoteCampaignExperimentOperation, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "campaign_experiment", url.QueryEscape(req.GetCampaignExperiment())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).PromoteCampaignExperiment[0:len((*c.CallOptions).PromoteCampaignExperiment):len((*c.CallOptions).PromoteCampaignExperiment)], opts...)
+	var resp *longrunningpb.Operation
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.campaignExperimentClient.PromoteCampaignExperiment(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &PromoteCampaignExperimentOperation{
+		lro: longrunning.InternalNewOperation(*c.LROClient, resp),
+	}, nil
+}
+
+func (c *campaignExperimentGRPCClient) EndCampaignExperiment(ctx context.Context, req *servicespb.EndCampaignExperimentRequest, opts ...gax.CallOption) error {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "campaign_experiment", url.QueryEscape(req.GetCampaignExperiment())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).EndCampaignExperiment[0:len((*c.CallOptions).EndCampaignExperiment):len((*c.CallOptions).EndCampaignExperiment)], opts...)
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		_, err = c.campaignExperimentClient.EndCampaignExperiment(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	return err
+}
+
+func (c *campaignExperimentGRPCClient) ListCampaignExperimentAsyncErrors(ctx context.Context, req *servicespb.ListCampaignExperimentAsyncErrorsRequest, opts ...gax.CallOption) *StatusIterator {
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).ListCampaignExperimentAsyncErrors[0:len((*c.CallOptions).ListCampaignExperimentAsyncErrors):len((*c.CallOptions).ListCampaignExperimentAsyncErrors)], opts...)
 	it := &StatusIterator{}
 	req = proto.Clone(req).(*servicespb.ListCampaignExperimentAsyncErrorsRequest)
 	it.InternalFetch = func(pageSize int, pageToken string) ([]*statuspb.Status, string, error) {
@@ -521,9 +630,9 @@ type CreateCampaignExperimentOperation struct {
 
 // CreateCampaignExperimentOperation returns a new CreateCampaignExperimentOperation from a given name.
 // The name must be that of a previously created CreateCampaignExperimentOperation, possibly from a different process.
-func (c *CampaignExperimentClient) CreateCampaignExperimentOperation(name string) *CreateCampaignExperimentOperation {
+func (c *campaignExperimentGRPCClient) CreateCampaignExperimentOperation(name string) *CreateCampaignExperimentOperation {
 	return &CreateCampaignExperimentOperation{
-		lro: longrunning.InternalNewOperation(c.LROClient, &longrunningpb.Operation{Name: name}),
+		lro: longrunning.InternalNewOperation(*c.LROClient, &longrunningpb.Operation{Name: name}),
 	}
 }
 
@@ -579,9 +688,9 @@ type PromoteCampaignExperimentOperation struct {
 
 // PromoteCampaignExperimentOperation returns a new PromoteCampaignExperimentOperation from a given name.
 // The name must be that of a previously created PromoteCampaignExperimentOperation, possibly from a different process.
-func (c *CampaignExperimentClient) PromoteCampaignExperimentOperation(name string) *PromoteCampaignExperimentOperation {
+func (c *campaignExperimentGRPCClient) PromoteCampaignExperimentOperation(name string) *PromoteCampaignExperimentOperation {
 	return &PromoteCampaignExperimentOperation{
-		lro: longrunning.InternalNewOperation(c.LROClient, &longrunningpb.Operation{Name: name}),
+		lro: longrunning.InternalNewOperation(*c.LROClient, &longrunningpb.Operation{Name: name}),
 	}
 }
 

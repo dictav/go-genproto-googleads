@@ -41,12 +41,13 @@ type AgeRangeViewCallOptions struct {
 	GetAgeRangeView []gax.CallOption
 }
 
-func defaultAgeRangeViewClientOptions() []option.ClientOption {
+func defaultAgeRangeViewGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -70,32 +71,87 @@ func defaultAgeRangeViewCallOptions() *AgeRangeViewCallOptions {
 	}
 }
 
+// internalAgeRangeViewClient is an interface that defines the methods availaible from Google Ads API.
+type internalAgeRangeViewClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetAgeRangeView(context.Context, *servicespb.GetAgeRangeViewRequest, ...gax.CallOption) (*resourcespb.AgeRangeView, error)
+}
+
 // AgeRangeViewClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage age range views.
+type AgeRangeViewClient struct {
+	// The internal transport-dependent client.
+	internalClient internalAgeRangeViewClient
+
+	// The call options for this service.
+	CallOptions *AgeRangeViewCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *AgeRangeViewClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *AgeRangeViewClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *AgeRangeViewClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// GetAgeRangeView returns the requested age range view in full detail.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *AgeRangeViewClient) GetAgeRangeView(ctx context.Context, req *servicespb.GetAgeRangeViewRequest, opts ...gax.CallOption) (*resourcespb.AgeRangeView, error) {
+	return c.internalClient.GetAgeRangeView(ctx, req, opts...)
+}
+
+// ageRangeViewGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type AgeRangeViewClient struct {
+type ageRangeViewGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing AgeRangeViewClient
+	CallOptions **AgeRangeViewCallOptions
+
 	// The gRPC API client.
 	ageRangeViewClient servicespb.AgeRangeViewServiceClient
-
-	// The call options for this service.
-	CallOptions *AgeRangeViewCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewAgeRangeViewClient creates a new age range view service client.
+// NewAgeRangeViewClient creates a new age range view service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // Service to manage age range views.
 func NewAgeRangeViewClient(ctx context.Context, opts ...option.ClientOption) (*AgeRangeViewClient, error) {
-	clientOpts := defaultAgeRangeViewClientOptions()
-
+	clientOpts := defaultAgeRangeViewGRPCClientOptions()
 	if newAgeRangeViewClientHook != nil {
 		hookOpts, err := newAgeRangeViewClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -113,50 +169,44 @@ func NewAgeRangeViewClient(ctx context.Context, opts ...option.ClientOption) (*A
 	if err != nil {
 		return nil, err
 	}
-	c := &AgeRangeViewClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultAgeRangeViewCallOptions(),
+	client := AgeRangeViewClient{CallOptions: defaultAgeRangeViewCallOptions()}
 
+	c := &ageRangeViewGRPCClient{
+		connPool:           connPool,
+		disableDeadlines:   disableDeadlines,
 		ageRangeViewClient: servicespb.NewAgeRangeViewServiceClient(connPool),
+		CallOptions:        &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *AgeRangeViewClient) Connection() *grpc.ClientConn {
+func (c *ageRangeViewGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *AgeRangeViewClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *AgeRangeViewClient) setGoogleClientInfo(keyval ...string) {
+func (c *ageRangeViewGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// GetAgeRangeView returns the requested age range view in full detail.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *AgeRangeViewClient) GetAgeRangeView(ctx context.Context, req *servicespb.GetAgeRangeViewRequest, opts ...gax.CallOption) (*resourcespb.AgeRangeView, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *ageRangeViewGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *ageRangeViewGRPCClient) GetAgeRangeView(ctx context.Context, req *servicespb.GetAgeRangeViewRequest, opts ...gax.CallOption) (*resourcespb.AgeRangeView, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -164,7 +214,7 @@ func (c *AgeRangeViewClient) GetAgeRangeView(ctx context.Context, req *servicesp
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetAgeRangeView[0:len(c.CallOptions.GetAgeRangeView):len(c.CallOptions.GetAgeRangeView)], opts...)
+	opts = append((*c.CallOptions).GetAgeRangeView[0:len((*c.CallOptions).GetAgeRangeView):len((*c.CallOptions).GetAgeRangeView)], opts...)
 	var resp *resourcespb.AgeRangeView
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

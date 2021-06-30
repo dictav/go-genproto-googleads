@@ -42,12 +42,13 @@ type AdGroupExtensionSettingCallOptions struct {
 	MutateAdGroupExtensionSettings []gax.CallOption
 }
 
-func defaultAdGroupExtensionSettingClientOptions() []option.ClientOption {
+func defaultAdGroupExtensionSettingGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -83,81 +84,47 @@ func defaultAdGroupExtensionSettingCallOptions() *AdGroupExtensionSettingCallOpt
 	}
 }
 
+// internalAdGroupExtensionSettingClient is an interface that defines the methods availaible from Google Ads API.
+type internalAdGroupExtensionSettingClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetAdGroupExtensionSetting(context.Context, *servicespb.GetAdGroupExtensionSettingRequest, ...gax.CallOption) (*resourcespb.AdGroupExtensionSetting, error)
+	MutateAdGroupExtensionSettings(context.Context, *servicespb.MutateAdGroupExtensionSettingsRequest, ...gax.CallOption) (*servicespb.MutateAdGroupExtensionSettingsResponse, error)
+}
+
 // AdGroupExtensionSettingClient is a client for interacting with Google Ads API.
-//
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage ad group extension settings.
 type AdGroupExtensionSettingClient struct {
-	// Connection pool of gRPC connections to the service.
-	connPool gtransport.ConnPool
-
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
-	// The gRPC API client.
-	adGroupExtensionSettingClient servicespb.AdGroupExtensionSettingServiceClient
+	// The internal transport-dependent client.
+	internalClient internalAdGroupExtensionSettingClient
 
 	// The call options for this service.
 	CallOptions *AdGroupExtensionSettingCallOptions
-
-	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
 }
 
-// NewAdGroupExtensionSettingClient creates a new ad group extension setting service client.
-//
-// Service to manage ad group extension settings.
-func NewAdGroupExtensionSettingClient(ctx context.Context, opts ...option.ClientOption) (*AdGroupExtensionSettingClient, error) {
-	clientOpts := defaultAdGroupExtensionSettingClientOptions()
-
-	if newAdGroupExtensionSettingClientHook != nil {
-		hookOpts, err := newAdGroupExtensionSettingClientHook(ctx, clientHookParams{})
-		if err != nil {
-			return nil, err
-		}
-		clientOpts = append(clientOpts, hookOpts...)
-	}
-
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
-	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
-	if err != nil {
-		return nil, err
-	}
-	c := &AdGroupExtensionSettingClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultAdGroupExtensionSettingCallOptions(),
-
-		adGroupExtensionSettingClient: servicespb.NewAdGroupExtensionSettingServiceClient(connPool),
-	}
-	c.setGoogleClientInfo()
-
-	return c, nil
-}
-
-// Connection returns a connection to the API service.
-//
-// Deprecated.
-func (c *AdGroupExtensionSettingClient) Connection() *grpc.ClientConn {
-	return c.connPool.Conn()
-}
+// Wrapper methods routed to the internal client.
 
 // Close closes the connection to the API service. The user should invoke this when
 // the client is no longer required.
 func (c *AdGroupExtensionSettingClient) Close() error {
-	return c.connPool.Close()
+	return c.internalClient.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *AdGroupExtensionSettingClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *AdGroupExtensionSettingClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
 }
 
 // GetAdGroupExtensionSetting returns the requested ad group extension setting in full detail.
@@ -170,24 +137,7 @@ func (c *AdGroupExtensionSettingClient) setGoogleClientInfo(keyval ...string) {
 // QuotaError (at )
 // RequestError (at )
 func (c *AdGroupExtensionSettingClient) GetAdGroupExtensionSetting(ctx context.Context, req *servicespb.GetAdGroupExtensionSettingRequest, opts ...gax.CallOption) (*resourcespb.AdGroupExtensionSetting, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetAdGroupExtensionSetting[0:len(c.CallOptions.GetAdGroupExtensionSetting):len(c.CallOptions.GetAdGroupExtensionSetting)], opts...)
-	var resp *resourcespb.AdGroupExtensionSetting
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.adGroupExtensionSettingClient.GetAdGroupExtensionSetting(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.GetAdGroupExtensionSetting(ctx, req, opts...)
 }
 
 // MutateAdGroupExtensionSettings creates, updates, or removes ad group extension settings. Operation
@@ -223,6 +173,111 @@ func (c *AdGroupExtensionSettingClient) GetAdGroupExtensionSetting(ctx context.C
 // StringLengthError (at )
 // UrlFieldError (at )
 func (c *AdGroupExtensionSettingClient) MutateAdGroupExtensionSettings(ctx context.Context, req *servicespb.MutateAdGroupExtensionSettingsRequest, opts ...gax.CallOption) (*servicespb.MutateAdGroupExtensionSettingsResponse, error) {
+	return c.internalClient.MutateAdGroupExtensionSettings(ctx, req, opts...)
+}
+
+// adGroupExtensionSettingGRPCClient is a client for interacting with Google Ads API over gRPC transport.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+type adGroupExtensionSettingGRPCClient struct {
+	// Connection pool of gRPC connections to the service.
+	connPool gtransport.ConnPool
+
+	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
+	disableDeadlines bool
+
+	// Points back to the CallOptions field of the containing AdGroupExtensionSettingClient
+	CallOptions **AdGroupExtensionSettingCallOptions
+
+	// The gRPC API client.
+	adGroupExtensionSettingClient servicespb.AdGroupExtensionSettingServiceClient
+
+	// The x-goog-* metadata to be sent with each request.
+	xGoogMetadata metadata.MD
+}
+
+// NewAdGroupExtensionSettingClient creates a new ad group extension setting service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
+//
+// Service to manage ad group extension settings.
+func NewAdGroupExtensionSettingClient(ctx context.Context, opts ...option.ClientOption) (*AdGroupExtensionSettingClient, error) {
+	clientOpts := defaultAdGroupExtensionSettingGRPCClientOptions()
+	if newAdGroupExtensionSettingClientHook != nil {
+		hookOpts, err := newAdGroupExtensionSettingClientHook(ctx, clientHookParams{})
+		if err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, hookOpts...)
+	}
+
+	disableDeadlines, err := checkDisableDeadlines()
+	if err != nil {
+		return nil, err
+	}
+
+	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
+	if err != nil {
+		return nil, err
+	}
+	client := AdGroupExtensionSettingClient{CallOptions: defaultAdGroupExtensionSettingCallOptions()}
+
+	c := &adGroupExtensionSettingGRPCClient{
+		connPool:                      connPool,
+		disableDeadlines:              disableDeadlines,
+		adGroupExtensionSettingClient: servicespb.NewAdGroupExtensionSettingServiceClient(connPool),
+		CallOptions:                   &client.CallOptions,
+	}
+	c.setGoogleClientInfo()
+
+	client.internalClient = c
+
+	return &client, nil
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *adGroupExtensionSettingGRPCClient) Connection() *grpc.ClientConn {
+	return c.connPool.Conn()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *adGroupExtensionSettingGRPCClient) setGoogleClientInfo(keyval ...string) {
+	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+}
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *adGroupExtensionSettingGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *adGroupExtensionSettingGRPCClient) GetAdGroupExtensionSetting(ctx context.Context, req *servicespb.GetAdGroupExtensionSettingRequest, opts ...gax.CallOption) (*resourcespb.AdGroupExtensionSetting, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).GetAdGroupExtensionSetting[0:len((*c.CallOptions).GetAdGroupExtensionSetting):len((*c.CallOptions).GetAdGroupExtensionSetting)], opts...)
+	var resp *resourcespb.AdGroupExtensionSetting
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.adGroupExtensionSettingClient.GetAdGroupExtensionSetting(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *adGroupExtensionSettingGRPCClient) MutateAdGroupExtensionSettings(ctx context.Context, req *servicespb.MutateAdGroupExtensionSettingsRequest, opts ...gax.CallOption) (*servicespb.MutateAdGroupExtensionSettingsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -230,7 +285,7 @@ func (c *AdGroupExtensionSettingClient) MutateAdGroupExtensionSettings(ctx conte
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateAdGroupExtensionSettings[0:len(c.CallOptions.MutateAdGroupExtensionSettings):len(c.CallOptions.MutateAdGroupExtensionSettings)], opts...)
+	opts = append((*c.CallOptions).MutateAdGroupExtensionSettings[0:len((*c.CallOptions).MutateAdGroupExtensionSettings):len((*c.CallOptions).MutateAdGroupExtensionSettings)], opts...)
 	var resp *servicespb.MutateAdGroupExtensionSettingsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

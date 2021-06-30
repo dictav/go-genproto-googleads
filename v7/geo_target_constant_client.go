@@ -42,12 +42,13 @@ type GeoTargetConstantCallOptions struct {
 	SuggestGeoTargetConstants []gax.CallOption
 }
 
-func defaultGeoTargetConstantClientOptions() []option.ClientOption {
+func defaultGeoTargetConstantGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -83,32 +84,102 @@ func defaultGeoTargetConstantCallOptions() *GeoTargetConstantCallOptions {
 	}
 }
 
+// internalGeoTargetConstantClient is an interface that defines the methods availaible from Google Ads API.
+type internalGeoTargetConstantClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetGeoTargetConstant(context.Context, *servicespb.GetGeoTargetConstantRequest, ...gax.CallOption) (*resourcespb.GeoTargetConstant, error)
+	SuggestGeoTargetConstants(context.Context, *servicespb.SuggestGeoTargetConstantsRequest, ...gax.CallOption) (*servicespb.SuggestGeoTargetConstantsResponse, error)
+}
+
 // GeoTargetConstantClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to fetch geo target constants.
+type GeoTargetConstantClient struct {
+	// The internal transport-dependent client.
+	internalClient internalGeoTargetConstantClient
+
+	// The call options for this service.
+	CallOptions *GeoTargetConstantCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *GeoTargetConstantClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *GeoTargetConstantClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *GeoTargetConstantClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// GetGeoTargetConstant returns the requested geo target constant in full detail.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *GeoTargetConstantClient) GetGeoTargetConstant(ctx context.Context, req *servicespb.GetGeoTargetConstantRequest, opts ...gax.CallOption) (*resourcespb.GeoTargetConstant, error) {
+	return c.internalClient.GetGeoTargetConstant(ctx, req, opts...)
+}
+
+// SuggestGeoTargetConstants returns GeoTargetConstant suggestions by location name or by resource name.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// GeoTargetConstantSuggestionError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *GeoTargetConstantClient) SuggestGeoTargetConstants(ctx context.Context, req *servicespb.SuggestGeoTargetConstantsRequest, opts ...gax.CallOption) (*servicespb.SuggestGeoTargetConstantsResponse, error) {
+	return c.internalClient.SuggestGeoTargetConstants(ctx, req, opts...)
+}
+
+// geoTargetConstantGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type GeoTargetConstantClient struct {
+type geoTargetConstantGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing GeoTargetConstantClient
+	CallOptions **GeoTargetConstantCallOptions
+
 	// The gRPC API client.
 	geoTargetConstantClient servicespb.GeoTargetConstantServiceClient
-
-	// The call options for this service.
-	CallOptions *GeoTargetConstantCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewGeoTargetConstantClient creates a new geo target constant service client.
+// NewGeoTargetConstantClient creates a new geo target constant service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // Service to fetch geo target constants.
 func NewGeoTargetConstantClient(ctx context.Context, opts ...option.ClientOption) (*GeoTargetConstantClient, error) {
-	clientOpts := defaultGeoTargetConstantClientOptions()
-
+	clientOpts := defaultGeoTargetConstantGRPCClientOptions()
 	if newGeoTargetConstantClientHook != nil {
 		hookOpts, err := newGeoTargetConstantClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -126,50 +197,44 @@ func NewGeoTargetConstantClient(ctx context.Context, opts ...option.ClientOption
 	if err != nil {
 		return nil, err
 	}
-	c := &GeoTargetConstantClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultGeoTargetConstantCallOptions(),
+	client := GeoTargetConstantClient{CallOptions: defaultGeoTargetConstantCallOptions()}
 
+	c := &geoTargetConstantGRPCClient{
+		connPool:                connPool,
+		disableDeadlines:        disableDeadlines,
 		geoTargetConstantClient: servicespb.NewGeoTargetConstantServiceClient(connPool),
+		CallOptions:             &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *GeoTargetConstantClient) Connection() *grpc.ClientConn {
+func (c *geoTargetConstantGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *GeoTargetConstantClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *GeoTargetConstantClient) setGoogleClientInfo(keyval ...string) {
+func (c *geoTargetConstantGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// GetGeoTargetConstant returns the requested geo target constant in full detail.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *GeoTargetConstantClient) GetGeoTargetConstant(ctx context.Context, req *servicespb.GetGeoTargetConstantRequest, opts ...gax.CallOption) (*resourcespb.GeoTargetConstant, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *geoTargetConstantGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *geoTargetConstantGRPCClient) GetGeoTargetConstant(ctx context.Context, req *servicespb.GetGeoTargetConstantRequest, opts ...gax.CallOption) (*resourcespb.GeoTargetConstant, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -177,7 +242,7 @@ func (c *GeoTargetConstantClient) GetGeoTargetConstant(ctx context.Context, req 
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetGeoTargetConstant[0:len(c.CallOptions.GetGeoTargetConstant):len(c.CallOptions.GetGeoTargetConstant)], opts...)
+	opts = append((*c.CallOptions).GetGeoTargetConstant[0:len((*c.CallOptions).GetGeoTargetConstant):len((*c.CallOptions).GetGeoTargetConstant)], opts...)
 	var resp *resourcespb.GeoTargetConstant
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
@@ -190,24 +255,14 @@ func (c *GeoTargetConstantClient) GetGeoTargetConstant(ctx context.Context, req 
 	return resp, nil
 }
 
-// SuggestGeoTargetConstants returns GeoTargetConstant suggestions by location name or by resource name.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// GeoTargetConstantSuggestionError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *GeoTargetConstantClient) SuggestGeoTargetConstants(ctx context.Context, req *servicespb.SuggestGeoTargetConstantsRequest, opts ...gax.CallOption) (*servicespb.SuggestGeoTargetConstantsResponse, error) {
+func (c *geoTargetConstantGRPCClient) SuggestGeoTargetConstants(ctx context.Context, req *servicespb.SuggestGeoTargetConstantsRequest, opts ...gax.CallOption) (*servicespb.SuggestGeoTargetConstantsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	ctx = insertMetadata(ctx, c.xGoogMetadata)
-	opts = append(c.CallOptions.SuggestGeoTargetConstants[0:len(c.CallOptions.SuggestGeoTargetConstants):len(c.CallOptions.SuggestGeoTargetConstants)], opts...)
+	opts = append((*c.CallOptions).SuggestGeoTargetConstants[0:len((*c.CallOptions).SuggestGeoTargetConstants):len((*c.CallOptions).SuggestGeoTargetConstants)], opts...)
 	var resp *servicespb.SuggestGeoTargetConstantsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

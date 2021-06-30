@@ -41,12 +41,13 @@ type ChangeStatusCallOptions struct {
 	GetChangeStatus []gax.CallOption
 }
 
-func defaultChangeStatusClientOptions() []option.ClientOption {
+func defaultChangeStatusGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -70,32 +71,87 @@ func defaultChangeStatusCallOptions() *ChangeStatusCallOptions {
 	}
 }
 
+// internalChangeStatusClient is an interface that defines the methods availaible from Google Ads API.
+type internalChangeStatusClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetChangeStatus(context.Context, *servicespb.GetChangeStatusRequest, ...gax.CallOption) (*resourcespb.ChangeStatus, error)
+}
+
 // ChangeStatusClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to fetch change statuses.
+type ChangeStatusClient struct {
+	// The internal transport-dependent client.
+	internalClient internalChangeStatusClient
+
+	// The call options for this service.
+	CallOptions *ChangeStatusCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *ChangeStatusClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *ChangeStatusClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *ChangeStatusClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// GetChangeStatus returns the requested change status in full detail.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *ChangeStatusClient) GetChangeStatus(ctx context.Context, req *servicespb.GetChangeStatusRequest, opts ...gax.CallOption) (*resourcespb.ChangeStatus, error) {
+	return c.internalClient.GetChangeStatus(ctx, req, opts...)
+}
+
+// changeStatusGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type ChangeStatusClient struct {
+type changeStatusGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing ChangeStatusClient
+	CallOptions **ChangeStatusCallOptions
+
 	// The gRPC API client.
 	changeStatusClient servicespb.ChangeStatusServiceClient
-
-	// The call options for this service.
-	CallOptions *ChangeStatusCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewChangeStatusClient creates a new change status service client.
+// NewChangeStatusClient creates a new change status service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // Service to fetch change statuses.
 func NewChangeStatusClient(ctx context.Context, opts ...option.ClientOption) (*ChangeStatusClient, error) {
-	clientOpts := defaultChangeStatusClientOptions()
-
+	clientOpts := defaultChangeStatusGRPCClientOptions()
 	if newChangeStatusClientHook != nil {
 		hookOpts, err := newChangeStatusClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -113,50 +169,44 @@ func NewChangeStatusClient(ctx context.Context, opts ...option.ClientOption) (*C
 	if err != nil {
 		return nil, err
 	}
-	c := &ChangeStatusClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultChangeStatusCallOptions(),
+	client := ChangeStatusClient{CallOptions: defaultChangeStatusCallOptions()}
 
+	c := &changeStatusGRPCClient{
+		connPool:           connPool,
+		disableDeadlines:   disableDeadlines,
 		changeStatusClient: servicespb.NewChangeStatusServiceClient(connPool),
+		CallOptions:        &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *ChangeStatusClient) Connection() *grpc.ClientConn {
+func (c *changeStatusGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *ChangeStatusClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *ChangeStatusClient) setGoogleClientInfo(keyval ...string) {
+func (c *changeStatusGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// GetChangeStatus returns the requested change status in full detail.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *ChangeStatusClient) GetChangeStatus(ctx context.Context, req *servicespb.GetChangeStatusRequest, opts ...gax.CallOption) (*resourcespb.ChangeStatus, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *changeStatusGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *changeStatusGRPCClient) GetChangeStatus(ctx context.Context, req *servicespb.GetChangeStatusRequest, opts ...gax.CallOption) (*resourcespb.ChangeStatus, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -164,7 +214,7 @@ func (c *ChangeStatusClient) GetChangeStatus(ctx context.Context, req *servicesp
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetChangeStatus[0:len(c.CallOptions.GetChangeStatus):len(c.CallOptions.GetChangeStatus)], opts...)
+	opts = append((*c.CallOptions).GetChangeStatus[0:len((*c.CallOptions).GetChangeStatus):len((*c.CallOptions).GetChangeStatus)], opts...)
 	var resp *resourcespb.ChangeStatus
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

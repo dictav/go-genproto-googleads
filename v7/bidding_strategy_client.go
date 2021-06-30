@@ -42,12 +42,13 @@ type BiddingStrategyCallOptions struct {
 	MutateBiddingStrategies []gax.CallOption
 }
 
-func defaultBiddingStrategyClientOptions() []option.ClientOption {
+func defaultBiddingStrategyGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -83,81 +84,47 @@ func defaultBiddingStrategyCallOptions() *BiddingStrategyCallOptions {
 	}
 }
 
+// internalBiddingStrategyClient is an interface that defines the methods availaible from Google Ads API.
+type internalBiddingStrategyClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetBiddingStrategy(context.Context, *servicespb.GetBiddingStrategyRequest, ...gax.CallOption) (*resourcespb.BiddingStrategy, error)
+	MutateBiddingStrategies(context.Context, *servicespb.MutateBiddingStrategiesRequest, ...gax.CallOption) (*servicespb.MutateBiddingStrategiesResponse, error)
+}
+
 // BiddingStrategyClient is a client for interacting with Google Ads API.
-//
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage bidding strategies.
 type BiddingStrategyClient struct {
-	// Connection pool of gRPC connections to the service.
-	connPool gtransport.ConnPool
-
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
-	// The gRPC API client.
-	biddingStrategyClient servicespb.BiddingStrategyServiceClient
+	// The internal transport-dependent client.
+	internalClient internalBiddingStrategyClient
 
 	// The call options for this service.
 	CallOptions *BiddingStrategyCallOptions
-
-	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
 }
 
-// NewBiddingStrategyClient creates a new bidding strategy service client.
-//
-// Service to manage bidding strategies.
-func NewBiddingStrategyClient(ctx context.Context, opts ...option.ClientOption) (*BiddingStrategyClient, error) {
-	clientOpts := defaultBiddingStrategyClientOptions()
-
-	if newBiddingStrategyClientHook != nil {
-		hookOpts, err := newBiddingStrategyClientHook(ctx, clientHookParams{})
-		if err != nil {
-			return nil, err
-		}
-		clientOpts = append(clientOpts, hookOpts...)
-	}
-
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
-	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
-	if err != nil {
-		return nil, err
-	}
-	c := &BiddingStrategyClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultBiddingStrategyCallOptions(),
-
-		biddingStrategyClient: servicespb.NewBiddingStrategyServiceClient(connPool),
-	}
-	c.setGoogleClientInfo()
-
-	return c, nil
-}
-
-// Connection returns a connection to the API service.
-//
-// Deprecated.
-func (c *BiddingStrategyClient) Connection() *grpc.ClientConn {
-	return c.connPool.Conn()
-}
+// Wrapper methods routed to the internal client.
 
 // Close closes the connection to the API service. The user should invoke this when
 // the client is no longer required.
 func (c *BiddingStrategyClient) Close() error {
-	return c.connPool.Close()
+	return c.internalClient.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *BiddingStrategyClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *BiddingStrategyClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
 }
 
 // GetBiddingStrategy returns the requested bidding strategy in full detail.
@@ -170,24 +137,7 @@ func (c *BiddingStrategyClient) setGoogleClientInfo(keyval ...string) {
 // QuotaError (at )
 // RequestError (at )
 func (c *BiddingStrategyClient) GetBiddingStrategy(ctx context.Context, req *servicespb.GetBiddingStrategyRequest, opts ...gax.CallOption) (*resourcespb.BiddingStrategy, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetBiddingStrategy[0:len(c.CallOptions.GetBiddingStrategy):len(c.CallOptions.GetBiddingStrategy)], opts...)
-	var resp *resourcespb.BiddingStrategy
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.biddingStrategyClient.GetBiddingStrategy(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.GetBiddingStrategy(ctx, req, opts...)
 }
 
 // MutateBiddingStrategies creates, updates, or removes bidding strategies. Operation statuses are
@@ -221,6 +171,111 @@ func (c *BiddingStrategyClient) GetBiddingStrategy(ctx context.Context, req *ser
 // StringFormatError (at )
 // StringLengthError (at )
 func (c *BiddingStrategyClient) MutateBiddingStrategies(ctx context.Context, req *servicespb.MutateBiddingStrategiesRequest, opts ...gax.CallOption) (*servicespb.MutateBiddingStrategiesResponse, error) {
+	return c.internalClient.MutateBiddingStrategies(ctx, req, opts...)
+}
+
+// biddingStrategyGRPCClient is a client for interacting with Google Ads API over gRPC transport.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+type biddingStrategyGRPCClient struct {
+	// Connection pool of gRPC connections to the service.
+	connPool gtransport.ConnPool
+
+	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
+	disableDeadlines bool
+
+	// Points back to the CallOptions field of the containing BiddingStrategyClient
+	CallOptions **BiddingStrategyCallOptions
+
+	// The gRPC API client.
+	biddingStrategyClient servicespb.BiddingStrategyServiceClient
+
+	// The x-goog-* metadata to be sent with each request.
+	xGoogMetadata metadata.MD
+}
+
+// NewBiddingStrategyClient creates a new bidding strategy service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
+//
+// Service to manage bidding strategies.
+func NewBiddingStrategyClient(ctx context.Context, opts ...option.ClientOption) (*BiddingStrategyClient, error) {
+	clientOpts := defaultBiddingStrategyGRPCClientOptions()
+	if newBiddingStrategyClientHook != nil {
+		hookOpts, err := newBiddingStrategyClientHook(ctx, clientHookParams{})
+		if err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, hookOpts...)
+	}
+
+	disableDeadlines, err := checkDisableDeadlines()
+	if err != nil {
+		return nil, err
+	}
+
+	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
+	if err != nil {
+		return nil, err
+	}
+	client := BiddingStrategyClient{CallOptions: defaultBiddingStrategyCallOptions()}
+
+	c := &biddingStrategyGRPCClient{
+		connPool:              connPool,
+		disableDeadlines:      disableDeadlines,
+		biddingStrategyClient: servicespb.NewBiddingStrategyServiceClient(connPool),
+		CallOptions:           &client.CallOptions,
+	}
+	c.setGoogleClientInfo()
+
+	client.internalClient = c
+
+	return &client, nil
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *biddingStrategyGRPCClient) Connection() *grpc.ClientConn {
+	return c.connPool.Conn()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *biddingStrategyGRPCClient) setGoogleClientInfo(keyval ...string) {
+	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+}
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *biddingStrategyGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *biddingStrategyGRPCClient) GetBiddingStrategy(ctx context.Context, req *servicespb.GetBiddingStrategyRequest, opts ...gax.CallOption) (*resourcespb.BiddingStrategy, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).GetBiddingStrategy[0:len((*c.CallOptions).GetBiddingStrategy):len((*c.CallOptions).GetBiddingStrategy)], opts...)
+	var resp *resourcespb.BiddingStrategy
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.biddingStrategyClient.GetBiddingStrategy(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *biddingStrategyGRPCClient) MutateBiddingStrategies(ctx context.Context, req *servicespb.MutateBiddingStrategiesRequest, opts ...gax.CallOption) (*servicespb.MutateBiddingStrategiesResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -228,7 +283,7 @@ func (c *BiddingStrategyClient) MutateBiddingStrategies(ctx context.Context, req
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateBiddingStrategies[0:len(c.CallOptions.MutateBiddingStrategies):len(c.CallOptions.MutateBiddingStrategies)], opts...)
+	opts = append((*c.CallOptions).MutateBiddingStrategies[0:len((*c.CallOptions).MutateBiddingStrategies):len((*c.CallOptions).MutateBiddingStrategies)], opts...)
 	var resp *servicespb.MutateBiddingStrategiesResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

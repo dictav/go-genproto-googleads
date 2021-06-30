@@ -42,12 +42,13 @@ type ThirdPartyAppAnalyticsLinkCallOptions struct {
 	RegenerateShareableLinkId     []gax.CallOption
 }
 
-func defaultThirdPartyAppAnalyticsLinkClientOptions() []option.ClientOption {
+func defaultThirdPartyAppAnalyticsLinkGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -83,33 +84,104 @@ func defaultThirdPartyAppAnalyticsLinkCallOptions() *ThirdPartyAppAnalyticsLinkC
 	}
 }
 
+// internalThirdPartyAppAnalyticsLinkClient is an interface that defines the methods availaible from Google Ads API.
+type internalThirdPartyAppAnalyticsLinkClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetThirdPartyAppAnalyticsLink(context.Context, *servicespb.GetThirdPartyAppAnalyticsLinkRequest, ...gax.CallOption) (*resourcespb.ThirdPartyAppAnalyticsLink, error)
+	RegenerateShareableLinkId(context.Context, *servicespb.RegenerateShareableLinkIdRequest, ...gax.CallOption) (*servicespb.RegenerateShareableLinkIdResponse, error)
+}
+
 // ThirdPartyAppAnalyticsLinkClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// This service allows management of links between Google Ads and third party
+// app analytics.
+type ThirdPartyAppAnalyticsLinkClient struct {
+	// The internal transport-dependent client.
+	internalClient internalThirdPartyAppAnalyticsLinkClient
+
+	// The call options for this service.
+	CallOptions *ThirdPartyAppAnalyticsLinkCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *ThirdPartyAppAnalyticsLinkClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *ThirdPartyAppAnalyticsLinkClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *ThirdPartyAppAnalyticsLinkClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// GetThirdPartyAppAnalyticsLink returns the third party app analytics link in full detail.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *ThirdPartyAppAnalyticsLinkClient) GetThirdPartyAppAnalyticsLink(ctx context.Context, req *servicespb.GetThirdPartyAppAnalyticsLinkRequest, opts ...gax.CallOption) (*resourcespb.ThirdPartyAppAnalyticsLink, error) {
+	return c.internalClient.GetThirdPartyAppAnalyticsLink(ctx, req, opts...)
+}
+
+// RegenerateShareableLinkId regenerate ThirdPartyAppAnalyticsLink.shareable_link_id that should be
+// provided to the third party when setting up app analytics.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *ThirdPartyAppAnalyticsLinkClient) RegenerateShareableLinkId(ctx context.Context, req *servicespb.RegenerateShareableLinkIdRequest, opts ...gax.CallOption) (*servicespb.RegenerateShareableLinkIdResponse, error) {
+	return c.internalClient.RegenerateShareableLinkId(ctx, req, opts...)
+}
+
+// thirdPartyAppAnalyticsLinkGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type ThirdPartyAppAnalyticsLinkClient struct {
+type thirdPartyAppAnalyticsLinkGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing ThirdPartyAppAnalyticsLinkClient
+	CallOptions **ThirdPartyAppAnalyticsLinkCallOptions
+
 	// The gRPC API client.
 	thirdPartyAppAnalyticsLinkClient servicespb.ThirdPartyAppAnalyticsLinkServiceClient
-
-	// The call options for this service.
-	CallOptions *ThirdPartyAppAnalyticsLinkCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewThirdPartyAppAnalyticsLinkClient creates a new third party app analytics link service client.
+// NewThirdPartyAppAnalyticsLinkClient creates a new third party app analytics link service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // This service allows management of links between Google Ads and third party
 // app analytics.
 func NewThirdPartyAppAnalyticsLinkClient(ctx context.Context, opts ...option.ClientOption) (*ThirdPartyAppAnalyticsLinkClient, error) {
-	clientOpts := defaultThirdPartyAppAnalyticsLinkClientOptions()
-
+	clientOpts := defaultThirdPartyAppAnalyticsLinkGRPCClientOptions()
 	if newThirdPartyAppAnalyticsLinkClientHook != nil {
 		hookOpts, err := newThirdPartyAppAnalyticsLinkClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -127,50 +199,44 @@ func NewThirdPartyAppAnalyticsLinkClient(ctx context.Context, opts ...option.Cli
 	if err != nil {
 		return nil, err
 	}
-	c := &ThirdPartyAppAnalyticsLinkClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultThirdPartyAppAnalyticsLinkCallOptions(),
+	client := ThirdPartyAppAnalyticsLinkClient{CallOptions: defaultThirdPartyAppAnalyticsLinkCallOptions()}
 
+	c := &thirdPartyAppAnalyticsLinkGRPCClient{
+		connPool:                         connPool,
+		disableDeadlines:                 disableDeadlines,
 		thirdPartyAppAnalyticsLinkClient: servicespb.NewThirdPartyAppAnalyticsLinkServiceClient(connPool),
+		CallOptions:                      &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *ThirdPartyAppAnalyticsLinkClient) Connection() *grpc.ClientConn {
+func (c *thirdPartyAppAnalyticsLinkGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *ThirdPartyAppAnalyticsLinkClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *ThirdPartyAppAnalyticsLinkClient) setGoogleClientInfo(keyval ...string) {
+func (c *thirdPartyAppAnalyticsLinkGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// GetThirdPartyAppAnalyticsLink returns the third party app analytics link in full detail.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *ThirdPartyAppAnalyticsLinkClient) GetThirdPartyAppAnalyticsLink(ctx context.Context, req *servicespb.GetThirdPartyAppAnalyticsLinkRequest, opts ...gax.CallOption) (*resourcespb.ThirdPartyAppAnalyticsLink, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *thirdPartyAppAnalyticsLinkGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *thirdPartyAppAnalyticsLinkGRPCClient) GetThirdPartyAppAnalyticsLink(ctx context.Context, req *servicespb.GetThirdPartyAppAnalyticsLinkRequest, opts ...gax.CallOption) (*resourcespb.ThirdPartyAppAnalyticsLink, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -178,7 +244,7 @@ func (c *ThirdPartyAppAnalyticsLinkClient) GetThirdPartyAppAnalyticsLink(ctx con
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetThirdPartyAppAnalyticsLink[0:len(c.CallOptions.GetThirdPartyAppAnalyticsLink):len(c.CallOptions.GetThirdPartyAppAnalyticsLink)], opts...)
+	opts = append((*c.CallOptions).GetThirdPartyAppAnalyticsLink[0:len((*c.CallOptions).GetThirdPartyAppAnalyticsLink):len((*c.CallOptions).GetThirdPartyAppAnalyticsLink)], opts...)
 	var resp *resourcespb.ThirdPartyAppAnalyticsLink
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
@@ -191,17 +257,7 @@ func (c *ThirdPartyAppAnalyticsLinkClient) GetThirdPartyAppAnalyticsLink(ctx con
 	return resp, nil
 }
 
-// RegenerateShareableLinkId regenerate ThirdPartyAppAnalyticsLink.shareable_link_id that should be
-// provided to the third party when setting up app analytics.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *ThirdPartyAppAnalyticsLinkClient) RegenerateShareableLinkId(ctx context.Context, req *servicespb.RegenerateShareableLinkIdRequest, opts ...gax.CallOption) (*servicespb.RegenerateShareableLinkIdResponse, error) {
+func (c *thirdPartyAppAnalyticsLinkGRPCClient) RegenerateShareableLinkId(ctx context.Context, req *servicespb.RegenerateShareableLinkIdRequest, opts ...gax.CallOption) (*servicespb.RegenerateShareableLinkIdResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -209,7 +265,7 @@ func (c *ThirdPartyAppAnalyticsLinkClient) RegenerateShareableLinkId(ctx context
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.RegenerateShareableLinkId[0:len(c.CallOptions.RegenerateShareableLinkId):len(c.CallOptions.RegenerateShareableLinkId)], opts...)
+	opts = append((*c.CallOptions).RegenerateShareableLinkId[0:len((*c.CallOptions).RegenerateShareableLinkId):len((*c.CallOptions).RegenerateShareableLinkId)], opts...)
 	var resp *servicespb.RegenerateShareableLinkIdResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

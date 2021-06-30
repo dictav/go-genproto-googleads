@@ -42,12 +42,13 @@ type CampaignSharedSetCallOptions struct {
 	MutateCampaignSharedSets []gax.CallOption
 }
 
-func defaultCampaignSharedSetClientOptions() []option.ClientOption {
+func defaultCampaignSharedSetGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -83,81 +84,47 @@ func defaultCampaignSharedSetCallOptions() *CampaignSharedSetCallOptions {
 	}
 }
 
+// internalCampaignSharedSetClient is an interface that defines the methods availaible from Google Ads API.
+type internalCampaignSharedSetClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetCampaignSharedSet(context.Context, *servicespb.GetCampaignSharedSetRequest, ...gax.CallOption) (*resourcespb.CampaignSharedSet, error)
+	MutateCampaignSharedSets(context.Context, *servicespb.MutateCampaignSharedSetsRequest, ...gax.CallOption) (*servicespb.MutateCampaignSharedSetsResponse, error)
+}
+
 // CampaignSharedSetClient is a client for interacting with Google Ads API.
-//
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage campaign shared sets.
 type CampaignSharedSetClient struct {
-	// Connection pool of gRPC connections to the service.
-	connPool gtransport.ConnPool
-
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
-	// The gRPC API client.
-	campaignSharedSetClient servicespb.CampaignSharedSetServiceClient
+	// The internal transport-dependent client.
+	internalClient internalCampaignSharedSetClient
 
 	// The call options for this service.
 	CallOptions *CampaignSharedSetCallOptions
-
-	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
 }
 
-// NewCampaignSharedSetClient creates a new campaign shared set service client.
-//
-// Service to manage campaign shared sets.
-func NewCampaignSharedSetClient(ctx context.Context, opts ...option.ClientOption) (*CampaignSharedSetClient, error) {
-	clientOpts := defaultCampaignSharedSetClientOptions()
-
-	if newCampaignSharedSetClientHook != nil {
-		hookOpts, err := newCampaignSharedSetClientHook(ctx, clientHookParams{})
-		if err != nil {
-			return nil, err
-		}
-		clientOpts = append(clientOpts, hookOpts...)
-	}
-
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
-	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
-	if err != nil {
-		return nil, err
-	}
-	c := &CampaignSharedSetClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultCampaignSharedSetCallOptions(),
-
-		campaignSharedSetClient: servicespb.NewCampaignSharedSetServiceClient(connPool),
-	}
-	c.setGoogleClientInfo()
-
-	return c, nil
-}
-
-// Connection returns a connection to the API service.
-//
-// Deprecated.
-func (c *CampaignSharedSetClient) Connection() *grpc.ClientConn {
-	return c.connPool.Conn()
-}
+// Wrapper methods routed to the internal client.
 
 // Close closes the connection to the API service. The user should invoke this when
 // the client is no longer required.
 func (c *CampaignSharedSetClient) Close() error {
-	return c.connPool.Close()
+	return c.internalClient.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *CampaignSharedSetClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *CampaignSharedSetClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
 }
 
 // GetCampaignSharedSet returns the requested campaign shared set in full detail.
@@ -170,24 +137,7 @@ func (c *CampaignSharedSetClient) setGoogleClientInfo(keyval ...string) {
 // QuotaError (at )
 // RequestError (at )
 func (c *CampaignSharedSetClient) GetCampaignSharedSet(ctx context.Context, req *servicespb.GetCampaignSharedSetRequest, opts ...gax.CallOption) (*resourcespb.CampaignSharedSet, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetCampaignSharedSet[0:len(c.CallOptions.GetCampaignSharedSet):len(c.CallOptions.GetCampaignSharedSet)], opts...)
-	var resp *resourcespb.CampaignSharedSet
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.campaignSharedSetClient.GetCampaignSharedSet(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.GetCampaignSharedSet(ctx, req, opts...)
 }
 
 // MutateCampaignSharedSets creates or removes campaign shared sets. Operation statuses are returned.
@@ -216,6 +166,111 @@ func (c *CampaignSharedSetClient) GetCampaignSharedSet(ctx context.Context, req 
 // StringFormatError (at )
 // StringLengthError (at )
 func (c *CampaignSharedSetClient) MutateCampaignSharedSets(ctx context.Context, req *servicespb.MutateCampaignSharedSetsRequest, opts ...gax.CallOption) (*servicespb.MutateCampaignSharedSetsResponse, error) {
+	return c.internalClient.MutateCampaignSharedSets(ctx, req, opts...)
+}
+
+// campaignSharedSetGRPCClient is a client for interacting with Google Ads API over gRPC transport.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+type campaignSharedSetGRPCClient struct {
+	// Connection pool of gRPC connections to the service.
+	connPool gtransport.ConnPool
+
+	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
+	disableDeadlines bool
+
+	// Points back to the CallOptions field of the containing CampaignSharedSetClient
+	CallOptions **CampaignSharedSetCallOptions
+
+	// The gRPC API client.
+	campaignSharedSetClient servicespb.CampaignSharedSetServiceClient
+
+	// The x-goog-* metadata to be sent with each request.
+	xGoogMetadata metadata.MD
+}
+
+// NewCampaignSharedSetClient creates a new campaign shared set service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
+//
+// Service to manage campaign shared sets.
+func NewCampaignSharedSetClient(ctx context.Context, opts ...option.ClientOption) (*CampaignSharedSetClient, error) {
+	clientOpts := defaultCampaignSharedSetGRPCClientOptions()
+	if newCampaignSharedSetClientHook != nil {
+		hookOpts, err := newCampaignSharedSetClientHook(ctx, clientHookParams{})
+		if err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, hookOpts...)
+	}
+
+	disableDeadlines, err := checkDisableDeadlines()
+	if err != nil {
+		return nil, err
+	}
+
+	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
+	if err != nil {
+		return nil, err
+	}
+	client := CampaignSharedSetClient{CallOptions: defaultCampaignSharedSetCallOptions()}
+
+	c := &campaignSharedSetGRPCClient{
+		connPool:                connPool,
+		disableDeadlines:        disableDeadlines,
+		campaignSharedSetClient: servicespb.NewCampaignSharedSetServiceClient(connPool),
+		CallOptions:             &client.CallOptions,
+	}
+	c.setGoogleClientInfo()
+
+	client.internalClient = c
+
+	return &client, nil
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *campaignSharedSetGRPCClient) Connection() *grpc.ClientConn {
+	return c.connPool.Conn()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *campaignSharedSetGRPCClient) setGoogleClientInfo(keyval ...string) {
+	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+}
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *campaignSharedSetGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *campaignSharedSetGRPCClient) GetCampaignSharedSet(ctx context.Context, req *servicespb.GetCampaignSharedSetRequest, opts ...gax.CallOption) (*resourcespb.CampaignSharedSet, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).GetCampaignSharedSet[0:len((*c.CallOptions).GetCampaignSharedSet):len((*c.CallOptions).GetCampaignSharedSet)], opts...)
+	var resp *resourcespb.CampaignSharedSet
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.campaignSharedSetClient.GetCampaignSharedSet(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *campaignSharedSetGRPCClient) MutateCampaignSharedSets(ctx context.Context, req *servicespb.MutateCampaignSharedSetsRequest, opts ...gax.CallOption) (*servicespb.MutateCampaignSharedSetsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -223,7 +278,7 @@ func (c *CampaignSharedSetClient) MutateCampaignSharedSets(ctx context.Context, 
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateCampaignSharedSets[0:len(c.CallOptions.MutateCampaignSharedSets):len(c.CallOptions.MutateCampaignSharedSets)], opts...)
+	opts = append((*c.CallOptions).MutateCampaignSharedSets[0:len((*c.CallOptions).MutateCampaignSharedSets):len((*c.CallOptions).MutateCampaignSharedSets)], opts...)
 	var resp *servicespb.MutateCampaignSharedSetsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

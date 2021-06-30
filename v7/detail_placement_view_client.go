@@ -41,12 +41,13 @@ type DetailPlacementViewCallOptions struct {
 	GetDetailPlacementView []gax.CallOption
 }
 
-func defaultDetailPlacementViewClientOptions() []option.ClientOption {
+func defaultDetailPlacementViewGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -70,32 +71,87 @@ func defaultDetailPlacementViewCallOptions() *DetailPlacementViewCallOptions {
 	}
 }
 
+// internalDetailPlacementViewClient is an interface that defines the methods availaible from Google Ads API.
+type internalDetailPlacementViewClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetDetailPlacementView(context.Context, *servicespb.GetDetailPlacementViewRequest, ...gax.CallOption) (*resourcespb.DetailPlacementView, error)
+}
+
 // DetailPlacementViewClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to fetch Detail Placement views.
+type DetailPlacementViewClient struct {
+	// The internal transport-dependent client.
+	internalClient internalDetailPlacementViewClient
+
+	// The call options for this service.
+	CallOptions *DetailPlacementViewCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *DetailPlacementViewClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *DetailPlacementViewClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *DetailPlacementViewClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// GetDetailPlacementView returns the requested Detail Placement view in full detail.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *DetailPlacementViewClient) GetDetailPlacementView(ctx context.Context, req *servicespb.GetDetailPlacementViewRequest, opts ...gax.CallOption) (*resourcespb.DetailPlacementView, error) {
+	return c.internalClient.GetDetailPlacementView(ctx, req, opts...)
+}
+
+// detailPlacementViewGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type DetailPlacementViewClient struct {
+type detailPlacementViewGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing DetailPlacementViewClient
+	CallOptions **DetailPlacementViewCallOptions
+
 	// The gRPC API client.
 	detailPlacementViewClient servicespb.DetailPlacementViewServiceClient
-
-	// The call options for this service.
-	CallOptions *DetailPlacementViewCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewDetailPlacementViewClient creates a new detail placement view service client.
+// NewDetailPlacementViewClient creates a new detail placement view service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // Service to fetch Detail Placement views.
 func NewDetailPlacementViewClient(ctx context.Context, opts ...option.ClientOption) (*DetailPlacementViewClient, error) {
-	clientOpts := defaultDetailPlacementViewClientOptions()
-
+	clientOpts := defaultDetailPlacementViewGRPCClientOptions()
 	if newDetailPlacementViewClientHook != nil {
 		hookOpts, err := newDetailPlacementViewClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -113,50 +169,44 @@ func NewDetailPlacementViewClient(ctx context.Context, opts ...option.ClientOpti
 	if err != nil {
 		return nil, err
 	}
-	c := &DetailPlacementViewClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultDetailPlacementViewCallOptions(),
+	client := DetailPlacementViewClient{CallOptions: defaultDetailPlacementViewCallOptions()}
 
+	c := &detailPlacementViewGRPCClient{
+		connPool:                  connPool,
+		disableDeadlines:          disableDeadlines,
 		detailPlacementViewClient: servicespb.NewDetailPlacementViewServiceClient(connPool),
+		CallOptions:               &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *DetailPlacementViewClient) Connection() *grpc.ClientConn {
+func (c *detailPlacementViewGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *DetailPlacementViewClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *DetailPlacementViewClient) setGoogleClientInfo(keyval ...string) {
+func (c *detailPlacementViewGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// GetDetailPlacementView returns the requested Detail Placement view in full detail.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *DetailPlacementViewClient) GetDetailPlacementView(ctx context.Context, req *servicespb.GetDetailPlacementViewRequest, opts ...gax.CallOption) (*resourcespb.DetailPlacementView, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *detailPlacementViewGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *detailPlacementViewGRPCClient) GetDetailPlacementView(ctx context.Context, req *servicespb.GetDetailPlacementViewRequest, opts ...gax.CallOption) (*resourcespb.DetailPlacementView, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -164,7 +214,7 @@ func (c *DetailPlacementViewClient) GetDetailPlacementView(ctx context.Context, 
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetDetailPlacementView[0:len(c.CallOptions.GetDetailPlacementView):len(c.CallOptions.GetDetailPlacementView)], opts...)
+	opts = append((*c.CallOptions).GetDetailPlacementView[0:len((*c.CallOptions).GetDetailPlacementView):len((*c.CallOptions).GetDetailPlacementView)], opts...)
 	var resp *resourcespb.DetailPlacementView
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

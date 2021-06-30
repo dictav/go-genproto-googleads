@@ -41,12 +41,13 @@ type AdGroupAdAssetViewCallOptions struct {
 	GetAdGroupAdAssetView []gax.CallOption
 }
 
-func defaultAdGroupAdAssetViewClientOptions() []option.ClientOption {
+func defaultAdGroupAdAssetViewGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -70,32 +71,87 @@ func defaultAdGroupAdAssetViewCallOptions() *AdGroupAdAssetViewCallOptions {
 	}
 }
 
+// internalAdGroupAdAssetViewClient is an interface that defines the methods availaible from Google Ads API.
+type internalAdGroupAdAssetViewClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetAdGroupAdAssetView(context.Context, *servicespb.GetAdGroupAdAssetViewRequest, ...gax.CallOption) (*resourcespb.AdGroupAdAssetView, error)
+}
+
 // AdGroupAdAssetViewClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to fetch ad group ad asset views.
+type AdGroupAdAssetViewClient struct {
+	// The internal transport-dependent client.
+	internalClient internalAdGroupAdAssetViewClient
+
+	// The call options for this service.
+	CallOptions *AdGroupAdAssetViewCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *AdGroupAdAssetViewClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *AdGroupAdAssetViewClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *AdGroupAdAssetViewClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// GetAdGroupAdAssetView returns the requested ad group ad asset view in full detail.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *AdGroupAdAssetViewClient) GetAdGroupAdAssetView(ctx context.Context, req *servicespb.GetAdGroupAdAssetViewRequest, opts ...gax.CallOption) (*resourcespb.AdGroupAdAssetView, error) {
+	return c.internalClient.GetAdGroupAdAssetView(ctx, req, opts...)
+}
+
+// adGroupAdAssetViewGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type AdGroupAdAssetViewClient struct {
+type adGroupAdAssetViewGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing AdGroupAdAssetViewClient
+	CallOptions **AdGroupAdAssetViewCallOptions
+
 	// The gRPC API client.
 	adGroupAdAssetViewClient servicespb.AdGroupAdAssetViewServiceClient
-
-	// The call options for this service.
-	CallOptions *AdGroupAdAssetViewCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewAdGroupAdAssetViewClient creates a new ad group ad asset view service client.
+// NewAdGroupAdAssetViewClient creates a new ad group ad asset view service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // Service to fetch ad group ad asset views.
 func NewAdGroupAdAssetViewClient(ctx context.Context, opts ...option.ClientOption) (*AdGroupAdAssetViewClient, error) {
-	clientOpts := defaultAdGroupAdAssetViewClientOptions()
-
+	clientOpts := defaultAdGroupAdAssetViewGRPCClientOptions()
 	if newAdGroupAdAssetViewClientHook != nil {
 		hookOpts, err := newAdGroupAdAssetViewClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -113,50 +169,44 @@ func NewAdGroupAdAssetViewClient(ctx context.Context, opts ...option.ClientOptio
 	if err != nil {
 		return nil, err
 	}
-	c := &AdGroupAdAssetViewClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultAdGroupAdAssetViewCallOptions(),
+	client := AdGroupAdAssetViewClient{CallOptions: defaultAdGroupAdAssetViewCallOptions()}
 
+	c := &adGroupAdAssetViewGRPCClient{
+		connPool:                 connPool,
+		disableDeadlines:         disableDeadlines,
 		adGroupAdAssetViewClient: servicespb.NewAdGroupAdAssetViewServiceClient(connPool),
+		CallOptions:              &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *AdGroupAdAssetViewClient) Connection() *grpc.ClientConn {
+func (c *adGroupAdAssetViewGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *AdGroupAdAssetViewClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *AdGroupAdAssetViewClient) setGoogleClientInfo(keyval ...string) {
+func (c *adGroupAdAssetViewGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// GetAdGroupAdAssetView returns the requested ad group ad asset view in full detail.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *AdGroupAdAssetViewClient) GetAdGroupAdAssetView(ctx context.Context, req *servicespb.GetAdGroupAdAssetViewRequest, opts ...gax.CallOption) (*resourcespb.AdGroupAdAssetView, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *adGroupAdAssetViewGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *adGroupAdAssetViewGRPCClient) GetAdGroupAdAssetView(ctx context.Context, req *servicespb.GetAdGroupAdAssetViewRequest, opts ...gax.CallOption) (*resourcespb.AdGroupAdAssetView, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -164,7 +214,7 @@ func (c *AdGroupAdAssetViewClient) GetAdGroupAdAssetView(ctx context.Context, re
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetAdGroupAdAssetView[0:len(c.CallOptions.GetAdGroupAdAssetView):len(c.CallOptions.GetAdGroupAdAssetView)], opts...)
+	opts = append((*c.CallOptions).GetAdGroupAdAssetView[0:len((*c.CallOptions).GetAdGroupAdAssetView):len((*c.CallOptions).GetAdGroupAdAssetView)], opts...)
 	var resp *resourcespb.AdGroupAdAssetView
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

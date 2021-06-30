@@ -41,12 +41,13 @@ type GeographicViewCallOptions struct {
 	GetGeographicView []gax.CallOption
 }
 
-func defaultGeographicViewClientOptions() []option.ClientOption {
+func defaultGeographicViewGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -70,32 +71,87 @@ func defaultGeographicViewCallOptions() *GeographicViewCallOptions {
 	}
 }
 
+// internalGeographicViewClient is an interface that defines the methods availaible from Google Ads API.
+type internalGeographicViewClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetGeographicView(context.Context, *servicespb.GetGeographicViewRequest, ...gax.CallOption) (*resourcespb.GeographicView, error)
+}
+
 // GeographicViewClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage geographic views.
+type GeographicViewClient struct {
+	// The internal transport-dependent client.
+	internalClient internalGeographicViewClient
+
+	// The call options for this service.
+	CallOptions *GeographicViewCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *GeographicViewClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *GeographicViewClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *GeographicViewClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// GetGeographicView returns the requested geographic view in full detail.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *GeographicViewClient) GetGeographicView(ctx context.Context, req *servicespb.GetGeographicViewRequest, opts ...gax.CallOption) (*resourcespb.GeographicView, error) {
+	return c.internalClient.GetGeographicView(ctx, req, opts...)
+}
+
+// geographicViewGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type GeographicViewClient struct {
+type geographicViewGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing GeographicViewClient
+	CallOptions **GeographicViewCallOptions
+
 	// The gRPC API client.
 	geographicViewClient servicespb.GeographicViewServiceClient
-
-	// The call options for this service.
-	CallOptions *GeographicViewCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewGeographicViewClient creates a new geographic view service client.
+// NewGeographicViewClient creates a new geographic view service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // Service to manage geographic views.
 func NewGeographicViewClient(ctx context.Context, opts ...option.ClientOption) (*GeographicViewClient, error) {
-	clientOpts := defaultGeographicViewClientOptions()
-
+	clientOpts := defaultGeographicViewGRPCClientOptions()
 	if newGeographicViewClientHook != nil {
 		hookOpts, err := newGeographicViewClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -113,50 +169,44 @@ func NewGeographicViewClient(ctx context.Context, opts ...option.ClientOption) (
 	if err != nil {
 		return nil, err
 	}
-	c := &GeographicViewClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultGeographicViewCallOptions(),
+	client := GeographicViewClient{CallOptions: defaultGeographicViewCallOptions()}
 
+	c := &geographicViewGRPCClient{
+		connPool:             connPool,
+		disableDeadlines:     disableDeadlines,
 		geographicViewClient: servicespb.NewGeographicViewServiceClient(connPool),
+		CallOptions:          &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *GeographicViewClient) Connection() *grpc.ClientConn {
+func (c *geographicViewGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *GeographicViewClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *GeographicViewClient) setGoogleClientInfo(keyval ...string) {
+func (c *geographicViewGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// GetGeographicView returns the requested geographic view in full detail.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *GeographicViewClient) GetGeographicView(ctx context.Context, req *servicespb.GetGeographicViewRequest, opts ...gax.CallOption) (*resourcespb.GeographicView, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *geographicViewGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *geographicViewGRPCClient) GetGeographicView(ctx context.Context, req *servicespb.GetGeographicViewRequest, opts ...gax.CallOption) (*resourcespb.GeographicView, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -164,7 +214,7 @@ func (c *GeographicViewClient) GetGeographicView(ctx context.Context, req *servi
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetGeographicView[0:len(c.CallOptions.GetGeographicView):len(c.CallOptions.GetGeographicView)], opts...)
+	opts = append((*c.CallOptions).GetGeographicView[0:len((*c.CallOptions).GetGeographicView):len((*c.CallOptions).GetGeographicView)], opts...)
 	var resp *resourcespb.GeographicView
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

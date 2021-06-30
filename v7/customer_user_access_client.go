@@ -42,12 +42,13 @@ type CustomerUserAccessCallOptions struct {
 	MutateCustomerUserAccess []gax.CallOption
 }
 
-func defaultCustomerUserAccessClientOptions() []option.ClientOption {
+func defaultCustomerUserAccessGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -83,32 +84,105 @@ func defaultCustomerUserAccessCallOptions() *CustomerUserAccessCallOptions {
 	}
 }
 
+// internalCustomerUserAccessClient is an interface that defines the methods availaible from Google Ads API.
+type internalCustomerUserAccessClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetCustomerUserAccess(context.Context, *servicespb.GetCustomerUserAccessRequest, ...gax.CallOption) (*resourcespb.CustomerUserAccess, error)
+	MutateCustomerUserAccess(context.Context, *servicespb.MutateCustomerUserAccessRequest, ...gax.CallOption) (*servicespb.MutateCustomerUserAccessResponse, error)
+}
+
 // CustomerUserAccessClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// This service manages the permissions of a user on a given customer.
+type CustomerUserAccessClient struct {
+	// The internal transport-dependent client.
+	internalClient internalCustomerUserAccessClient
+
+	// The call options for this service.
+	CallOptions *CustomerUserAccessCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *CustomerUserAccessClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *CustomerUserAccessClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *CustomerUserAccessClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// GetCustomerUserAccess returns the CustomerUserAccess in full detail.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *CustomerUserAccessClient) GetCustomerUserAccess(ctx context.Context, req *servicespb.GetCustomerUserAccessRequest, opts ...gax.CallOption) (*resourcespb.CustomerUserAccess, error) {
+	return c.internalClient.GetCustomerUserAccess(ctx, req, opts...)
+}
+
+// MutateCustomerUserAccess updates, removes permission of a user on a given customer. Operation
+// statuses are returned.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// CustomerUserAccessError (at )
+// FieldMaskError (at )
+// HeaderError (at )
+// InternalError (at )
+// MutateError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *CustomerUserAccessClient) MutateCustomerUserAccess(ctx context.Context, req *servicespb.MutateCustomerUserAccessRequest, opts ...gax.CallOption) (*servicespb.MutateCustomerUserAccessResponse, error) {
+	return c.internalClient.MutateCustomerUserAccess(ctx, req, opts...)
+}
+
+// customerUserAccessGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type CustomerUserAccessClient struct {
+type customerUserAccessGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing CustomerUserAccessClient
+	CallOptions **CustomerUserAccessCallOptions
+
 	// The gRPC API client.
 	customerUserAccessClient servicespb.CustomerUserAccessServiceClient
-
-	// The call options for this service.
-	CallOptions *CustomerUserAccessCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewCustomerUserAccessClient creates a new customer user access service client.
+// NewCustomerUserAccessClient creates a new customer user access service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // This service manages the permissions of a user on a given customer.
 func NewCustomerUserAccessClient(ctx context.Context, opts ...option.ClientOption) (*CustomerUserAccessClient, error) {
-	clientOpts := defaultCustomerUserAccessClientOptions()
-
+	clientOpts := defaultCustomerUserAccessGRPCClientOptions()
 	if newCustomerUserAccessClientHook != nil {
 		hookOpts, err := newCustomerUserAccessClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -126,50 +200,44 @@ func NewCustomerUserAccessClient(ctx context.Context, opts ...option.ClientOptio
 	if err != nil {
 		return nil, err
 	}
-	c := &CustomerUserAccessClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultCustomerUserAccessCallOptions(),
+	client := CustomerUserAccessClient{CallOptions: defaultCustomerUserAccessCallOptions()}
 
+	c := &customerUserAccessGRPCClient{
+		connPool:                 connPool,
+		disableDeadlines:         disableDeadlines,
 		customerUserAccessClient: servicespb.NewCustomerUserAccessServiceClient(connPool),
+		CallOptions:              &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *CustomerUserAccessClient) Connection() *grpc.ClientConn {
+func (c *customerUserAccessGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *CustomerUserAccessClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *CustomerUserAccessClient) setGoogleClientInfo(keyval ...string) {
+func (c *customerUserAccessGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// GetCustomerUserAccess returns the CustomerUserAccess in full detail.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *CustomerUserAccessClient) GetCustomerUserAccess(ctx context.Context, req *servicespb.GetCustomerUserAccessRequest, opts ...gax.CallOption) (*resourcespb.CustomerUserAccess, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *customerUserAccessGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *customerUserAccessGRPCClient) GetCustomerUserAccess(ctx context.Context, req *servicespb.GetCustomerUserAccessRequest, opts ...gax.CallOption) (*resourcespb.CustomerUserAccess, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -177,7 +245,7 @@ func (c *CustomerUserAccessClient) GetCustomerUserAccess(ctx context.Context, re
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetCustomerUserAccess[0:len(c.CallOptions.GetCustomerUserAccess):len(c.CallOptions.GetCustomerUserAccess)], opts...)
+	opts = append((*c.CallOptions).GetCustomerUserAccess[0:len((*c.CallOptions).GetCustomerUserAccess):len((*c.CallOptions).GetCustomerUserAccess)], opts...)
 	var resp *resourcespb.CustomerUserAccess
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
@@ -190,20 +258,7 @@ func (c *CustomerUserAccessClient) GetCustomerUserAccess(ctx context.Context, re
 	return resp, nil
 }
 
-// MutateCustomerUserAccess updates, removes permission of a user on a given customer. Operation
-// statuses are returned.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// CustomerUserAccessError (at )
-// FieldMaskError (at )
-// HeaderError (at )
-// InternalError (at )
-// MutateError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *CustomerUserAccessClient) MutateCustomerUserAccess(ctx context.Context, req *servicespb.MutateCustomerUserAccessRequest, opts ...gax.CallOption) (*servicespb.MutateCustomerUserAccessResponse, error) {
+func (c *customerUserAccessGRPCClient) MutateCustomerUserAccess(ctx context.Context, req *servicespb.MutateCustomerUserAccessRequest, opts ...gax.CallOption) (*servicespb.MutateCustomerUserAccessResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -211,7 +266,7 @@ func (c *CustomerUserAccessClient) MutateCustomerUserAccess(ctx context.Context,
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateCustomerUserAccess[0:len(c.CallOptions.MutateCustomerUserAccess):len(c.CallOptions.MutateCustomerUserAccess)], opts...)
+	opts = append((*c.CallOptions).MutateCustomerUserAccess[0:len((*c.CallOptions).MutateCustomerUserAccess):len((*c.CallOptions).MutateCustomerUserAccess)], opts...)
 	var resp *servicespb.MutateCustomerUserAccessResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

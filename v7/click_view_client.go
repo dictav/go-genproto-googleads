@@ -41,12 +41,13 @@ type ClickViewCallOptions struct {
 	GetClickView []gax.CallOption
 }
 
-func defaultClickViewClientOptions() []option.ClientOption {
+func defaultClickViewGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -70,32 +71,87 @@ func defaultClickViewCallOptions() *ClickViewCallOptions {
 	}
 }
 
+// internalClickViewClient is an interface that defines the methods availaible from Google Ads API.
+type internalClickViewClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetClickView(context.Context, *servicespb.GetClickViewRequest, ...gax.CallOption) (*resourcespb.ClickView, error)
+}
+
 // ClickViewClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to fetch click views.
+type ClickViewClient struct {
+	// The internal transport-dependent client.
+	internalClient internalClickViewClient
+
+	// The call options for this service.
+	CallOptions *ClickViewCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *ClickViewClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *ClickViewClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *ClickViewClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// GetClickView returns the requested click view in full detail.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *ClickViewClient) GetClickView(ctx context.Context, req *servicespb.GetClickViewRequest, opts ...gax.CallOption) (*resourcespb.ClickView, error) {
+	return c.internalClient.GetClickView(ctx, req, opts...)
+}
+
+// clickViewGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type ClickViewClient struct {
+type clickViewGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing ClickViewClient
+	CallOptions **ClickViewCallOptions
+
 	// The gRPC API client.
 	clickViewClient servicespb.ClickViewServiceClient
-
-	// The call options for this service.
-	CallOptions *ClickViewCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewClickViewClient creates a new click view service client.
+// NewClickViewClient creates a new click view service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // Service to fetch click views.
 func NewClickViewClient(ctx context.Context, opts ...option.ClientOption) (*ClickViewClient, error) {
-	clientOpts := defaultClickViewClientOptions()
-
+	clientOpts := defaultClickViewGRPCClientOptions()
 	if newClickViewClientHook != nil {
 		hookOpts, err := newClickViewClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -113,50 +169,44 @@ func NewClickViewClient(ctx context.Context, opts ...option.ClientOption) (*Clic
 	if err != nil {
 		return nil, err
 	}
-	c := &ClickViewClient{
+	client := ClickViewClient{CallOptions: defaultClickViewCallOptions()}
+
+	c := &clickViewGRPCClient{
 		connPool:         connPool,
 		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultClickViewCallOptions(),
-
-		clickViewClient: servicespb.NewClickViewServiceClient(connPool),
+		clickViewClient:  servicespb.NewClickViewServiceClient(connPool),
+		CallOptions:      &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *ClickViewClient) Connection() *grpc.ClientConn {
+func (c *clickViewGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *ClickViewClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *ClickViewClient) setGoogleClientInfo(keyval ...string) {
+func (c *clickViewGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// GetClickView returns the requested click view in full detail.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *ClickViewClient) GetClickView(ctx context.Context, req *servicespb.GetClickViewRequest, opts ...gax.CallOption) (*resourcespb.ClickView, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *clickViewGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *clickViewGRPCClient) GetClickView(ctx context.Context, req *servicespb.GetClickViewRequest, opts ...gax.CallOption) (*resourcespb.ClickView, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -164,7 +214,7 @@ func (c *ClickViewClient) GetClickView(ctx context.Context, req *servicespb.GetC
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetClickView[0:len(c.CallOptions.GetClickView):len(c.CallOptions.GetClickView)], opts...)
+	opts = append((*c.CallOptions).GetClickView[0:len((*c.CallOptions).GetClickView):len((*c.CallOptions).GetClickView)], opts...)
 	var resp *resourcespb.ClickView
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

@@ -42,12 +42,13 @@ type ConversionCustomVariableCallOptions struct {
 	MutateConversionCustomVariables []gax.CallOption
 }
 
-func defaultConversionCustomVariableClientOptions() []option.ClientOption {
+func defaultConversionCustomVariableGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -83,32 +84,104 @@ func defaultConversionCustomVariableCallOptions() *ConversionCustomVariableCallO
 	}
 }
 
+// internalConversionCustomVariableClient is an interface that defines the methods availaible from Google Ads API.
+type internalConversionCustomVariableClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetConversionCustomVariable(context.Context, *servicespb.GetConversionCustomVariableRequest, ...gax.CallOption) (*resourcespb.ConversionCustomVariable, error)
+	MutateConversionCustomVariables(context.Context, *servicespb.MutateConversionCustomVariablesRequest, ...gax.CallOption) (*servicespb.MutateConversionCustomVariablesResponse, error)
+}
+
 // ConversionCustomVariableClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage conversion custom variables.
+type ConversionCustomVariableClient struct {
+	// The internal transport-dependent client.
+	internalClient internalConversionCustomVariableClient
+
+	// The call options for this service.
+	CallOptions *ConversionCustomVariableCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *ConversionCustomVariableClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *ConversionCustomVariableClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *ConversionCustomVariableClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// GetConversionCustomVariable returns the requested conversion custom variable.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *ConversionCustomVariableClient) GetConversionCustomVariable(ctx context.Context, req *servicespb.GetConversionCustomVariableRequest, opts ...gax.CallOption) (*resourcespb.ConversionCustomVariable, error) {
+	return c.internalClient.GetConversionCustomVariable(ctx, req, opts...)
+}
+
+// MutateConversionCustomVariables creates or updates conversion custom variables. Operation statuses are
+// returned.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// ConversionCustomVariableError (at )
+// DatabaseError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *ConversionCustomVariableClient) MutateConversionCustomVariables(ctx context.Context, req *servicespb.MutateConversionCustomVariablesRequest, opts ...gax.CallOption) (*servicespb.MutateConversionCustomVariablesResponse, error) {
+	return c.internalClient.MutateConversionCustomVariables(ctx, req, opts...)
+}
+
+// conversionCustomVariableGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type ConversionCustomVariableClient struct {
+type conversionCustomVariableGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing ConversionCustomVariableClient
+	CallOptions **ConversionCustomVariableCallOptions
+
 	// The gRPC API client.
 	conversionCustomVariableClient servicespb.ConversionCustomVariableServiceClient
-
-	// The call options for this service.
-	CallOptions *ConversionCustomVariableCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewConversionCustomVariableClient creates a new conversion custom variable service client.
+// NewConversionCustomVariableClient creates a new conversion custom variable service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // Service to manage conversion custom variables.
 func NewConversionCustomVariableClient(ctx context.Context, opts ...option.ClientOption) (*ConversionCustomVariableClient, error) {
-	clientOpts := defaultConversionCustomVariableClientOptions()
-
+	clientOpts := defaultConversionCustomVariableGRPCClientOptions()
 	if newConversionCustomVariableClientHook != nil {
 		hookOpts, err := newConversionCustomVariableClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -126,50 +199,44 @@ func NewConversionCustomVariableClient(ctx context.Context, opts ...option.Clien
 	if err != nil {
 		return nil, err
 	}
-	c := &ConversionCustomVariableClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultConversionCustomVariableCallOptions(),
+	client := ConversionCustomVariableClient{CallOptions: defaultConversionCustomVariableCallOptions()}
 
+	c := &conversionCustomVariableGRPCClient{
+		connPool:                       connPool,
+		disableDeadlines:               disableDeadlines,
 		conversionCustomVariableClient: servicespb.NewConversionCustomVariableServiceClient(connPool),
+		CallOptions:                    &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *ConversionCustomVariableClient) Connection() *grpc.ClientConn {
+func (c *conversionCustomVariableGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *ConversionCustomVariableClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *ConversionCustomVariableClient) setGoogleClientInfo(keyval ...string) {
+func (c *conversionCustomVariableGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// GetConversionCustomVariable returns the requested conversion custom variable.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *ConversionCustomVariableClient) GetConversionCustomVariable(ctx context.Context, req *servicespb.GetConversionCustomVariableRequest, opts ...gax.CallOption) (*resourcespb.ConversionCustomVariable, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *conversionCustomVariableGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *conversionCustomVariableGRPCClient) GetConversionCustomVariable(ctx context.Context, req *servicespb.GetConversionCustomVariableRequest, opts ...gax.CallOption) (*resourcespb.ConversionCustomVariable, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -177,7 +244,7 @@ func (c *ConversionCustomVariableClient) GetConversionCustomVariable(ctx context
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetConversionCustomVariable[0:len(c.CallOptions.GetConversionCustomVariable):len(c.CallOptions.GetConversionCustomVariable)], opts...)
+	opts = append((*c.CallOptions).GetConversionCustomVariable[0:len((*c.CallOptions).GetConversionCustomVariable):len((*c.CallOptions).GetConversionCustomVariable)], opts...)
 	var resp *resourcespb.ConversionCustomVariable
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
@@ -190,19 +257,7 @@ func (c *ConversionCustomVariableClient) GetConversionCustomVariable(ctx context
 	return resp, nil
 }
 
-// MutateConversionCustomVariables creates or updates conversion custom variables. Operation statuses are
-// returned.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// ConversionCustomVariableError (at )
-// DatabaseError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *ConversionCustomVariableClient) MutateConversionCustomVariables(ctx context.Context, req *servicespb.MutateConversionCustomVariablesRequest, opts ...gax.CallOption) (*servicespb.MutateConversionCustomVariablesResponse, error) {
+func (c *conversionCustomVariableGRPCClient) MutateConversionCustomVariables(ctx context.Context, req *servicespb.MutateConversionCustomVariablesRequest, opts ...gax.CallOption) (*servicespb.MutateConversionCustomVariablesResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -210,7 +265,7 @@ func (c *ConversionCustomVariableClient) MutateConversionCustomVariables(ctx con
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateConversionCustomVariables[0:len(c.CallOptions.MutateConversionCustomVariables):len(c.CallOptions.MutateConversionCustomVariables)], opts...)
+	opts = append((*c.CallOptions).MutateConversionCustomVariables[0:len((*c.CallOptions).MutateConversionCustomVariables):len((*c.CallOptions).MutateConversionCustomVariables)], opts...)
 	var resp *servicespb.MutateConversionCustomVariablesResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

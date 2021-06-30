@@ -43,12 +43,13 @@ type AccountLinkCallOptions struct {
 	MutateAccountLink []gax.CallOption
 }
 
-func defaultAccountLinkClientOptions() []option.ClientOption {
+func defaultAccountLinkGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -96,82 +97,49 @@ func defaultAccountLinkCallOptions() *AccountLinkCallOptions {
 	}
 }
 
-// AccountLinkClient is a client for interacting with Google Ads API.
-//
-// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type AccountLinkClient struct {
-	// Connection pool of gRPC connections to the service.
-	connPool gtransport.ConnPool
-
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
-	// The gRPC API client.
-	accountLinkClient servicespb.AccountLinkServiceClient
-
-	// The call options for this service.
-	CallOptions *AccountLinkCallOptions
-
-	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
+// internalAccountLinkClient is an interface that defines the methods availaible from Google Ads API.
+type internalAccountLinkClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetAccountLink(context.Context, *servicespb.GetAccountLinkRequest, ...gax.CallOption) (*resourcespb.AccountLink, error)
+	CreateAccountLink(context.Context, *servicespb.CreateAccountLinkRequest, ...gax.CallOption) (*servicespb.CreateAccountLinkResponse, error)
+	MutateAccountLink(context.Context, *servicespb.MutateAccountLinkRequest, ...gax.CallOption) (*servicespb.MutateAccountLinkResponse, error)
 }
 
-// NewAccountLinkClient creates a new account link service client.
+// AccountLinkClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
 //
 // This service allows management of links between Google Ads accounts and other
 // accounts.
-func NewAccountLinkClient(ctx context.Context, opts ...option.ClientOption) (*AccountLinkClient, error) {
-	clientOpts := defaultAccountLinkClientOptions()
+type AccountLinkClient struct {
+	// The internal transport-dependent client.
+	internalClient internalAccountLinkClient
 
-	if newAccountLinkClientHook != nil {
-		hookOpts, err := newAccountLinkClientHook(ctx, clientHookParams{})
-		if err != nil {
-			return nil, err
-		}
-		clientOpts = append(clientOpts, hookOpts...)
-	}
-
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
-	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
-	if err != nil {
-		return nil, err
-	}
-	c := &AccountLinkClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultAccountLinkCallOptions(),
-
-		accountLinkClient: servicespb.NewAccountLinkServiceClient(connPool),
-	}
-	c.setGoogleClientInfo()
-
-	return c, nil
+	// The call options for this service.
+	CallOptions *AccountLinkCallOptions
 }
 
-// Connection returns a connection to the API service.
-//
-// Deprecated.
-func (c *AccountLinkClient) Connection() *grpc.ClientConn {
-	return c.connPool.Conn()
-}
+// Wrapper methods routed to the internal client.
 
 // Close closes the connection to the API service. The user should invoke this when
 // the client is no longer required.
 func (c *AccountLinkClient) Close() error {
-	return c.connPool.Close()
+	return c.internalClient.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *AccountLinkClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *AccountLinkClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
 }
 
 // GetAccountLink returns the account link in full detail.
@@ -184,24 +152,7 @@ func (c *AccountLinkClient) setGoogleClientInfo(keyval ...string) {
 // QuotaError (at )
 // RequestError (at )
 func (c *AccountLinkClient) GetAccountLink(ctx context.Context, req *servicespb.GetAccountLinkRequest, opts ...gax.CallOption) (*resourcespb.AccountLink, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetAccountLink[0:len(c.CallOptions.GetAccountLink):len(c.CallOptions.GetAccountLink)], opts...)
-	var resp *resourcespb.AccountLink
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.accountLinkClient.GetAccountLink(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.GetAccountLink(ctx, req, opts...)
 }
 
 // CreateAccountLink creates an account link.
@@ -218,24 +169,7 @@ func (c *AccountLinkClient) GetAccountLink(ctx context.Context, req *servicespb.
 // RequestError (at )
 // ThirdPartyAppAnalyticsLinkError (at )
 func (c *AccountLinkClient) CreateAccountLink(ctx context.Context, req *servicespb.CreateAccountLinkRequest, opts ...gax.CallOption) (*servicespb.CreateAccountLinkResponse, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.CreateAccountLink[0:len(c.CallOptions.CreateAccountLink):len(c.CallOptions.CreateAccountLink)], opts...)
-	var resp *servicespb.CreateAccountLinkResponse
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.accountLinkClient.CreateAccountLink(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.CreateAccountLink(ctx, req, opts...)
 }
 
 // MutateAccountLink creates or removes an account link.
@@ -254,6 +188,112 @@ func (c *AccountLinkClient) CreateAccountLink(ctx context.Context, req *services
 // QuotaError (at )
 // RequestError (at )
 func (c *AccountLinkClient) MutateAccountLink(ctx context.Context, req *servicespb.MutateAccountLinkRequest, opts ...gax.CallOption) (*servicespb.MutateAccountLinkResponse, error) {
+	return c.internalClient.MutateAccountLink(ctx, req, opts...)
+}
+
+// accountLinkGRPCClient is a client for interacting with Google Ads API over gRPC transport.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+type accountLinkGRPCClient struct {
+	// Connection pool of gRPC connections to the service.
+	connPool gtransport.ConnPool
+
+	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
+	disableDeadlines bool
+
+	// Points back to the CallOptions field of the containing AccountLinkClient
+	CallOptions **AccountLinkCallOptions
+
+	// The gRPC API client.
+	accountLinkClient servicespb.AccountLinkServiceClient
+
+	// The x-goog-* metadata to be sent with each request.
+	xGoogMetadata metadata.MD
+}
+
+// NewAccountLinkClient creates a new account link service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
+//
+// This service allows management of links between Google Ads accounts and other
+// accounts.
+func NewAccountLinkClient(ctx context.Context, opts ...option.ClientOption) (*AccountLinkClient, error) {
+	clientOpts := defaultAccountLinkGRPCClientOptions()
+	if newAccountLinkClientHook != nil {
+		hookOpts, err := newAccountLinkClientHook(ctx, clientHookParams{})
+		if err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, hookOpts...)
+	}
+
+	disableDeadlines, err := checkDisableDeadlines()
+	if err != nil {
+		return nil, err
+	}
+
+	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
+	if err != nil {
+		return nil, err
+	}
+	client := AccountLinkClient{CallOptions: defaultAccountLinkCallOptions()}
+
+	c := &accountLinkGRPCClient{
+		connPool:          connPool,
+		disableDeadlines:  disableDeadlines,
+		accountLinkClient: servicespb.NewAccountLinkServiceClient(connPool),
+		CallOptions:       &client.CallOptions,
+	}
+	c.setGoogleClientInfo()
+
+	client.internalClient = c
+
+	return &client, nil
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *accountLinkGRPCClient) Connection() *grpc.ClientConn {
+	return c.connPool.Conn()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *accountLinkGRPCClient) setGoogleClientInfo(keyval ...string) {
+	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+}
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *accountLinkGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *accountLinkGRPCClient) GetAccountLink(ctx context.Context, req *servicespb.GetAccountLinkRequest, opts ...gax.CallOption) (*resourcespb.AccountLink, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).GetAccountLink[0:len((*c.CallOptions).GetAccountLink):len((*c.CallOptions).GetAccountLink)], opts...)
+	var resp *resourcespb.AccountLink
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.accountLinkClient.GetAccountLink(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *accountLinkGRPCClient) CreateAccountLink(ctx context.Context, req *servicespb.CreateAccountLinkRequest, opts ...gax.CallOption) (*servicespb.CreateAccountLinkResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -261,7 +301,28 @@ func (c *AccountLinkClient) MutateAccountLink(ctx context.Context, req *services
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateAccountLink[0:len(c.CallOptions.MutateAccountLink):len(c.CallOptions.MutateAccountLink)], opts...)
+	opts = append((*c.CallOptions).CreateAccountLink[0:len((*c.CallOptions).CreateAccountLink):len((*c.CallOptions).CreateAccountLink)], opts...)
+	var resp *servicespb.CreateAccountLinkResponse
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.accountLinkClient.CreateAccountLink(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *accountLinkGRPCClient) MutateAccountLink(ctx context.Context, req *servicespb.MutateAccountLinkRequest, opts ...gax.CallOption) (*servicespb.MutateAccountLinkResponse, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).MutateAccountLink[0:len((*c.CallOptions).MutateAccountLink):len((*c.CallOptions).MutateAccountLink)], opts...)
 	var resp *servicespb.MutateAccountLinkResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

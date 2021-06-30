@@ -23,7 +23,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	gax "github.com/googleapis/gax-go/v2"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -33,6 +32,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/proto"
 )
 
 var newClientHook clientHook
@@ -44,12 +44,13 @@ type CallOptions struct {
 	Mutate       []gax.CallOption
 }
 
-func defaultClientOptions() []option.ClientOption {
+func defaultGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -97,81 +98,48 @@ func defaultCallOptions() *CallOptions {
 	}
 }
 
+// internalClient is an interface that defines the methods availaible from Google Ads API.
+type internalClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	Search(context.Context, *servicespb.SearchGoogleAdsRequest, ...gax.CallOption) *GoogleAdsRowIterator
+	SearchStream(context.Context, *servicespb.SearchGoogleAdsStreamRequest, ...gax.CallOption) (servicespb.GoogleAdsService_SearchStreamClient, error)
+	Mutate(context.Context, *servicespb.MutateGoogleAdsRequest, ...gax.CallOption) (*servicespb.MutateGoogleAdsResponse, error)
+}
+
 // Client is a client for interacting with Google Ads API.
-//
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to fetch data and metrics across resources.
 type Client struct {
-	// Connection pool of gRPC connections to the service.
-	connPool gtransport.ConnPool
-
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
-	// The gRPC API client.
-	client servicespb.GoogleAdsServiceClient
+	// The internal transport-dependent client.
+	internalClient internalClient
 
 	// The call options for this service.
 	CallOptions *CallOptions
-
-	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
 }
 
-// NewClient creates a new google ads service client.
-//
-// Service to fetch data and metrics across resources.
-func NewClient(ctx context.Context, opts ...option.ClientOption) (*Client, error) {
-	clientOpts := defaultClientOptions()
-
-	if newClientHook != nil {
-		hookOpts, err := newClientHook(ctx, clientHookParams{})
-		if err != nil {
-			return nil, err
-		}
-		clientOpts = append(clientOpts, hookOpts...)
-	}
-
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
-	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
-	if err != nil {
-		return nil, err
-	}
-	c := &Client{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultCallOptions(),
-
-		client: servicespb.NewGoogleAdsServiceClient(connPool),
-	}
-	c.setGoogleClientInfo()
-
-	return c, nil
-}
-
-// Connection returns a connection to the API service.
-//
-// Deprecated.
-func (c *Client) Connection() *grpc.ClientConn {
-	return c.connPool.Conn()
-}
+// Wrapper methods routed to the internal client.
 
 // Close closes the connection to the API service. The user should invoke this when
 // the client is no longer required.
 func (c *Client) Close() error {
-	return c.connPool.Close()
+	return c.internalClient.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *Client) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *Client) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
 }
 
 // Search returns all rows that match the search query.
@@ -188,43 +156,7 @@ func (c *Client) setGoogleClientInfo(keyval ...string) {
 // QuotaError (at )
 // RequestError (at )
 func (c *Client) Search(ctx context.Context, req *servicespb.SearchGoogleAdsRequest, opts ...gax.CallOption) *GoogleAdsRowIterator {
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.Search[0:len(c.CallOptions.Search):len(c.CallOptions.Search)], opts...)
-	it := &GoogleAdsRowIterator{}
-	req = proto.Clone(req).(*servicespb.SearchGoogleAdsRequest)
-	it.InternalFetch = func(pageSize int, pageToken string) ([]*servicespb.GoogleAdsRow, string, error) {
-		var resp *servicespb.SearchGoogleAdsResponse
-		req.PageToken = pageToken
-		if pageSize > math.MaxInt32 {
-			req.PageSize = math.MaxInt32
-		} else {
-			req.PageSize = int32(pageSize)
-		}
-		err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-			var err error
-			resp, err = c.client.Search(ctx, req, settings.GRPC...)
-			return err
-		}, opts...)
-		if err != nil {
-			return nil, "", err
-		}
-
-		it.Response = resp
-		return resp.GetResults(), resp.GetNextPageToken(), nil
-	}
-	fetch := func(pageSize int, pageToken string) (string, error) {
-		items, nextPageToken, err := it.InternalFetch(pageSize, pageToken)
-		if err != nil {
-			return "", err
-		}
-		it.items = append(it.items, items...)
-		return nextPageToken, nil
-	}
-	it.pageInfo, it.nextFunc = iterator.NewPageInfo(fetch, it.bufLen, it.takeBuf)
-	it.pageInfo.MaxSize = int(req.GetPageSize())
-	it.pageInfo.Token = req.GetPageToken()
-	return it
+	return c.internalClient.Search(ctx, req, opts...)
 }
 
 // SearchStream returns all rows that match the search stream query.
@@ -241,19 +173,7 @@ func (c *Client) Search(ctx context.Context, req *servicespb.SearchGoogleAdsRequ
 // QuotaError (at )
 // RequestError (at )
 func (c *Client) SearchStream(ctx context.Context, req *servicespb.SearchGoogleAdsStreamRequest, opts ...gax.CallOption) (servicespb.GoogleAdsService_SearchStreamClient, error) {
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.SearchStream[0:len(c.CallOptions.SearchStream):len(c.CallOptions.SearchStream)], opts...)
-	var resp servicespb.GoogleAdsService_SearchStreamClient
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.client.SearchStream(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.SearchStream(ctx, req, opts...)
 }
 
 // Mutate creates, updates, or removes resources. This method supports atomic
@@ -368,6 +288,145 @@ func (c *Client) SearchStream(ctx context.Context, req *servicespb.SearchGoogleA
 // UserListError (at )
 // YoutubeVideoRegistrationError (at )
 func (c *Client) Mutate(ctx context.Context, req *servicespb.MutateGoogleAdsRequest, opts ...gax.CallOption) (*servicespb.MutateGoogleAdsResponse, error) {
+	return c.internalClient.Mutate(ctx, req, opts...)
+}
+
+// gRPCClient is a client for interacting with Google Ads API over gRPC transport.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+type gRPCClient struct {
+	// Connection pool of gRPC connections to the service.
+	connPool gtransport.ConnPool
+
+	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
+	disableDeadlines bool
+
+	// Points back to the CallOptions field of the containing Client
+	CallOptions **CallOptions
+
+	// The gRPC API client.
+	client servicespb.GoogleAdsServiceClient
+
+	// The x-goog-* metadata to be sent with each request.
+	xGoogMetadata metadata.MD
+}
+
+// NewClient creates a new google ads service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
+//
+// Service to fetch data and metrics across resources.
+func NewClient(ctx context.Context, opts ...option.ClientOption) (*Client, error) {
+	clientOpts := defaultGRPCClientOptions()
+	if newClientHook != nil {
+		hookOpts, err := newClientHook(ctx, clientHookParams{})
+		if err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, hookOpts...)
+	}
+
+	disableDeadlines, err := checkDisableDeadlines()
+	if err != nil {
+		return nil, err
+	}
+
+	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
+	if err != nil {
+		return nil, err
+	}
+	client := Client{CallOptions: defaultCallOptions()}
+
+	c := &gRPCClient{
+		connPool:         connPool,
+		disableDeadlines: disableDeadlines,
+		client:           servicespb.NewGoogleAdsServiceClient(connPool),
+		CallOptions:      &client.CallOptions,
+	}
+	c.setGoogleClientInfo()
+
+	client.internalClient = c
+
+	return &client, nil
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *gRPCClient) Connection() *grpc.ClientConn {
+	return c.connPool.Conn()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *gRPCClient) setGoogleClientInfo(keyval ...string) {
+	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+}
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *gRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *gRPCClient) Search(ctx context.Context, req *servicespb.SearchGoogleAdsRequest, opts ...gax.CallOption) *GoogleAdsRowIterator {
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).Search[0:len((*c.CallOptions).Search):len((*c.CallOptions).Search)], opts...)
+	it := &GoogleAdsRowIterator{}
+	req = proto.Clone(req).(*servicespb.SearchGoogleAdsRequest)
+	it.InternalFetch = func(pageSize int, pageToken string) ([]*servicespb.GoogleAdsRow, string, error) {
+		var resp *servicespb.SearchGoogleAdsResponse
+		req.PageToken = pageToken
+		if pageSize > math.MaxInt32 {
+			req.PageSize = math.MaxInt32
+		} else {
+			req.PageSize = int32(pageSize)
+		}
+		err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+			var err error
+			resp, err = c.client.Search(ctx, req, settings.GRPC...)
+			return err
+		}, opts...)
+		if err != nil {
+			return nil, "", err
+		}
+
+		it.Response = resp
+		return resp.GetResults(), resp.GetNextPageToken(), nil
+	}
+	fetch := func(pageSize int, pageToken string) (string, error) {
+		items, nextPageToken, err := it.InternalFetch(pageSize, pageToken)
+		if err != nil {
+			return "", err
+		}
+		it.items = append(it.items, items...)
+		return nextPageToken, nil
+	}
+	it.pageInfo, it.nextFunc = iterator.NewPageInfo(fetch, it.bufLen, it.takeBuf)
+	it.pageInfo.MaxSize = int(req.GetPageSize())
+	it.pageInfo.Token = req.GetPageToken()
+	return it
+}
+
+func (c *gRPCClient) SearchStream(ctx context.Context, req *servicespb.SearchGoogleAdsStreamRequest, opts ...gax.CallOption) (servicespb.GoogleAdsService_SearchStreamClient, error) {
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	var resp servicespb.GoogleAdsService_SearchStreamClient
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.client.SearchStream(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *gRPCClient) Mutate(ctx context.Context, req *servicespb.MutateGoogleAdsRequest, opts ...gax.CallOption) (*servicespb.MutateGoogleAdsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -375,7 +434,7 @@ func (c *Client) Mutate(ctx context.Context, req *servicespb.MutateGoogleAdsRequ
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.Mutate[0:len(c.CallOptions.Mutate):len(c.CallOptions.Mutate)], opts...)
+	opts = append((*c.CallOptions).Mutate[0:len((*c.CallOptions).Mutate):len((*c.CallOptions).Mutate)], opts...)
 	var resp *servicespb.MutateGoogleAdsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

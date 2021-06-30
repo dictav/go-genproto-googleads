@@ -41,12 +41,13 @@ type ExpandedLandingPageViewCallOptions struct {
 	GetExpandedLandingPageView []gax.CallOption
 }
 
-func defaultExpandedLandingPageViewClientOptions() []option.ClientOption {
+func defaultExpandedLandingPageViewGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -70,32 +71,87 @@ func defaultExpandedLandingPageViewCallOptions() *ExpandedLandingPageViewCallOpt
 	}
 }
 
+// internalExpandedLandingPageViewClient is an interface that defines the methods availaible from Google Ads API.
+type internalExpandedLandingPageViewClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetExpandedLandingPageView(context.Context, *servicespb.GetExpandedLandingPageViewRequest, ...gax.CallOption) (*resourcespb.ExpandedLandingPageView, error)
+}
+
 // ExpandedLandingPageViewClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to fetch expanded landing page views.
+type ExpandedLandingPageViewClient struct {
+	// The internal transport-dependent client.
+	internalClient internalExpandedLandingPageViewClient
+
+	// The call options for this service.
+	CallOptions *ExpandedLandingPageViewCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *ExpandedLandingPageViewClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *ExpandedLandingPageViewClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *ExpandedLandingPageViewClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// GetExpandedLandingPageView returns the requested expanded landing page view in full detail.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *ExpandedLandingPageViewClient) GetExpandedLandingPageView(ctx context.Context, req *servicespb.GetExpandedLandingPageViewRequest, opts ...gax.CallOption) (*resourcespb.ExpandedLandingPageView, error) {
+	return c.internalClient.GetExpandedLandingPageView(ctx, req, opts...)
+}
+
+// expandedLandingPageViewGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type ExpandedLandingPageViewClient struct {
+type expandedLandingPageViewGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing ExpandedLandingPageViewClient
+	CallOptions **ExpandedLandingPageViewCallOptions
+
 	// The gRPC API client.
 	expandedLandingPageViewClient servicespb.ExpandedLandingPageViewServiceClient
-
-	// The call options for this service.
-	CallOptions *ExpandedLandingPageViewCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewExpandedLandingPageViewClient creates a new expanded landing page view service client.
+// NewExpandedLandingPageViewClient creates a new expanded landing page view service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // Service to fetch expanded landing page views.
 func NewExpandedLandingPageViewClient(ctx context.Context, opts ...option.ClientOption) (*ExpandedLandingPageViewClient, error) {
-	clientOpts := defaultExpandedLandingPageViewClientOptions()
-
+	clientOpts := defaultExpandedLandingPageViewGRPCClientOptions()
 	if newExpandedLandingPageViewClientHook != nil {
 		hookOpts, err := newExpandedLandingPageViewClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -113,50 +169,44 @@ func NewExpandedLandingPageViewClient(ctx context.Context, opts ...option.Client
 	if err != nil {
 		return nil, err
 	}
-	c := &ExpandedLandingPageViewClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultExpandedLandingPageViewCallOptions(),
+	client := ExpandedLandingPageViewClient{CallOptions: defaultExpandedLandingPageViewCallOptions()}
 
+	c := &expandedLandingPageViewGRPCClient{
+		connPool:                      connPool,
+		disableDeadlines:              disableDeadlines,
 		expandedLandingPageViewClient: servicespb.NewExpandedLandingPageViewServiceClient(connPool),
+		CallOptions:                   &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *ExpandedLandingPageViewClient) Connection() *grpc.ClientConn {
+func (c *expandedLandingPageViewGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *ExpandedLandingPageViewClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *ExpandedLandingPageViewClient) setGoogleClientInfo(keyval ...string) {
+func (c *expandedLandingPageViewGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// GetExpandedLandingPageView returns the requested expanded landing page view in full detail.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *ExpandedLandingPageViewClient) GetExpandedLandingPageView(ctx context.Context, req *servicespb.GetExpandedLandingPageViewRequest, opts ...gax.CallOption) (*resourcespb.ExpandedLandingPageView, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *expandedLandingPageViewGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *expandedLandingPageViewGRPCClient) GetExpandedLandingPageView(ctx context.Context, req *servicespb.GetExpandedLandingPageViewRequest, opts ...gax.CallOption) (*resourcespb.ExpandedLandingPageView, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -164,7 +214,7 @@ func (c *ExpandedLandingPageViewClient) GetExpandedLandingPageView(ctx context.C
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetExpandedLandingPageView[0:len(c.CallOptions.GetExpandedLandingPageView):len(c.CallOptions.GetExpandedLandingPageView)], opts...)
+	opts = append((*c.CallOptions).GetExpandedLandingPageView[0:len((*c.CallOptions).GetExpandedLandingPageView):len((*c.CallOptions).GetExpandedLandingPageView)], opts...)
 	var resp *resourcespb.ExpandedLandingPageView
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

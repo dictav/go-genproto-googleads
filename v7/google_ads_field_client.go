@@ -23,7 +23,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	gax "github.com/googleapis/gax-go/v2"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -34,6 +33,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/proto"
 )
 
 var newGoogleAdsFieldClientHook clientHook
@@ -44,12 +44,13 @@ type GoogleAdsFieldCallOptions struct {
 	SearchGoogleAdsFields []gax.CallOption
 }
 
-func defaultGoogleAdsFieldClientOptions() []option.ClientOption {
+func defaultGoogleAdsFieldGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -85,32 +86,102 @@ func defaultGoogleAdsFieldCallOptions() *GoogleAdsFieldCallOptions {
 	}
 }
 
+// internalGoogleAdsFieldClient is an interface that defines the methods availaible from Google Ads API.
+type internalGoogleAdsFieldClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetGoogleAdsField(context.Context, *servicespb.GetGoogleAdsFieldRequest, ...gax.CallOption) (*resourcespb.GoogleAdsField, error)
+	SearchGoogleAdsFields(context.Context, *servicespb.SearchGoogleAdsFieldsRequest, ...gax.CallOption) *GoogleAdsFieldIterator
+}
+
 // GoogleAdsFieldClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to fetch Google Ads API fields.
+type GoogleAdsFieldClient struct {
+	// The internal transport-dependent client.
+	internalClient internalGoogleAdsFieldClient
+
+	// The call options for this service.
+	CallOptions *GoogleAdsFieldCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *GoogleAdsFieldClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *GoogleAdsFieldClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *GoogleAdsFieldClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// GetGoogleAdsField returns just the requested field.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *GoogleAdsFieldClient) GetGoogleAdsField(ctx context.Context, req *servicespb.GetGoogleAdsFieldRequest, opts ...gax.CallOption) (*resourcespb.GoogleAdsField, error) {
+	return c.internalClient.GetGoogleAdsField(ctx, req, opts...)
+}
+
+// SearchGoogleAdsFields returns all fields that match the search query.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QueryError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *GoogleAdsFieldClient) SearchGoogleAdsFields(ctx context.Context, req *servicespb.SearchGoogleAdsFieldsRequest, opts ...gax.CallOption) *GoogleAdsFieldIterator {
+	return c.internalClient.SearchGoogleAdsFields(ctx, req, opts...)
+}
+
+// googleAdsFieldGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type GoogleAdsFieldClient struct {
+type googleAdsFieldGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing GoogleAdsFieldClient
+	CallOptions **GoogleAdsFieldCallOptions
+
 	// The gRPC API client.
 	googleAdsFieldClient servicespb.GoogleAdsFieldServiceClient
-
-	// The call options for this service.
-	CallOptions *GoogleAdsFieldCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewGoogleAdsFieldClient creates a new google ads field service client.
+// NewGoogleAdsFieldClient creates a new google ads field service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // Service to fetch Google Ads API fields.
 func NewGoogleAdsFieldClient(ctx context.Context, opts ...option.ClientOption) (*GoogleAdsFieldClient, error) {
-	clientOpts := defaultGoogleAdsFieldClientOptions()
-
+	clientOpts := defaultGoogleAdsFieldGRPCClientOptions()
 	if newGoogleAdsFieldClientHook != nil {
 		hookOpts, err := newGoogleAdsFieldClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -128,50 +199,44 @@ func NewGoogleAdsFieldClient(ctx context.Context, opts ...option.ClientOption) (
 	if err != nil {
 		return nil, err
 	}
-	c := &GoogleAdsFieldClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultGoogleAdsFieldCallOptions(),
+	client := GoogleAdsFieldClient{CallOptions: defaultGoogleAdsFieldCallOptions()}
 
+	c := &googleAdsFieldGRPCClient{
+		connPool:             connPool,
+		disableDeadlines:     disableDeadlines,
 		googleAdsFieldClient: servicespb.NewGoogleAdsFieldServiceClient(connPool),
+		CallOptions:          &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *GoogleAdsFieldClient) Connection() *grpc.ClientConn {
+func (c *googleAdsFieldGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *GoogleAdsFieldClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *GoogleAdsFieldClient) setGoogleClientInfo(keyval ...string) {
+func (c *googleAdsFieldGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// GetGoogleAdsField returns just the requested field.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *GoogleAdsFieldClient) GetGoogleAdsField(ctx context.Context, req *servicespb.GetGoogleAdsFieldRequest, opts ...gax.CallOption) (*resourcespb.GoogleAdsField, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *googleAdsFieldGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *googleAdsFieldGRPCClient) GetGoogleAdsField(ctx context.Context, req *servicespb.GetGoogleAdsFieldRequest, opts ...gax.CallOption) (*resourcespb.GoogleAdsField, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -179,7 +244,7 @@ func (c *GoogleAdsFieldClient) GetGoogleAdsField(ctx context.Context, req *servi
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetGoogleAdsField[0:len(c.CallOptions.GetGoogleAdsField):len(c.CallOptions.GetGoogleAdsField)], opts...)
+	opts = append((*c.CallOptions).GetGoogleAdsField[0:len((*c.CallOptions).GetGoogleAdsField):len((*c.CallOptions).GetGoogleAdsField)], opts...)
 	var resp *resourcespb.GoogleAdsField
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
@@ -192,19 +257,9 @@ func (c *GoogleAdsFieldClient) GetGoogleAdsField(ctx context.Context, req *servi
 	return resp, nil
 }
 
-// SearchGoogleAdsFields returns all fields that match the search query.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QueryError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *GoogleAdsFieldClient) SearchGoogleAdsFields(ctx context.Context, req *servicespb.SearchGoogleAdsFieldsRequest, opts ...gax.CallOption) *GoogleAdsFieldIterator {
+func (c *googleAdsFieldGRPCClient) SearchGoogleAdsFields(ctx context.Context, req *servicespb.SearchGoogleAdsFieldsRequest, opts ...gax.CallOption) *GoogleAdsFieldIterator {
 	ctx = insertMetadata(ctx, c.xGoogMetadata)
-	opts = append(c.CallOptions.SearchGoogleAdsFields[0:len(c.CallOptions.SearchGoogleAdsFields):len(c.CallOptions.SearchGoogleAdsFields)], opts...)
+	opts = append((*c.CallOptions).SearchGoogleAdsFields[0:len((*c.CallOptions).SearchGoogleAdsFields):len((*c.CallOptions).SearchGoogleAdsFields)], opts...)
 	it := &GoogleAdsFieldIterator{}
 	req = proto.Clone(req).(*servicespb.SearchGoogleAdsFieldsRequest)
 	it.InternalFetch = func(pageSize int, pageToken string) ([]*resourcespb.GoogleAdsField, string, error) {

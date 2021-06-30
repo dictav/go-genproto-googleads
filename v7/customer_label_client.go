@@ -42,12 +42,13 @@ type CustomerLabelCallOptions struct {
 	MutateCustomerLabels []gax.CallOption
 }
 
-func defaultCustomerLabelClientOptions() []option.ClientOption {
+func defaultCustomerLabelGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -83,32 +84,105 @@ func defaultCustomerLabelCallOptions() *CustomerLabelCallOptions {
 	}
 }
 
+// internalCustomerLabelClient is an interface that defines the methods availaible from Google Ads API.
+type internalCustomerLabelClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetCustomerLabel(context.Context, *servicespb.GetCustomerLabelRequest, ...gax.CallOption) (*resourcespb.CustomerLabel, error)
+	MutateCustomerLabels(context.Context, *servicespb.MutateCustomerLabelsRequest, ...gax.CallOption) (*servicespb.MutateCustomerLabelsResponse, error)
+}
+
 // CustomerLabelClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage labels on customers.
+type CustomerLabelClient struct {
+	// The internal transport-dependent client.
+	internalClient internalCustomerLabelClient
+
+	// The call options for this service.
+	CallOptions *CustomerLabelCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *CustomerLabelClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *CustomerLabelClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *CustomerLabelClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// GetCustomerLabel returns the requested customer-label relationship in full detail.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *CustomerLabelClient) GetCustomerLabel(ctx context.Context, req *servicespb.GetCustomerLabelRequest, opts ...gax.CallOption) (*resourcespb.CustomerLabel, error) {
+	return c.internalClient.GetCustomerLabel(ctx, req, opts...)
+}
+
+// MutateCustomerLabels creates and removes customer-label relationships.
+// Operation statuses are returned.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// DatabaseError (at )
+// HeaderError (at )
+// InternalError (at )
+// LabelError (at )
+// MutateError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *CustomerLabelClient) MutateCustomerLabels(ctx context.Context, req *servicespb.MutateCustomerLabelsRequest, opts ...gax.CallOption) (*servicespb.MutateCustomerLabelsResponse, error) {
+	return c.internalClient.MutateCustomerLabels(ctx, req, opts...)
+}
+
+// customerLabelGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type CustomerLabelClient struct {
+type customerLabelGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing CustomerLabelClient
+	CallOptions **CustomerLabelCallOptions
+
 	// The gRPC API client.
 	customerLabelClient servicespb.CustomerLabelServiceClient
-
-	// The call options for this service.
-	CallOptions *CustomerLabelCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewCustomerLabelClient creates a new customer label service client.
+// NewCustomerLabelClient creates a new customer label service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // Service to manage labels on customers.
 func NewCustomerLabelClient(ctx context.Context, opts ...option.ClientOption) (*CustomerLabelClient, error) {
-	clientOpts := defaultCustomerLabelClientOptions()
-
+	clientOpts := defaultCustomerLabelGRPCClientOptions()
 	if newCustomerLabelClientHook != nil {
 		hookOpts, err := newCustomerLabelClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -126,50 +200,44 @@ func NewCustomerLabelClient(ctx context.Context, opts ...option.ClientOption) (*
 	if err != nil {
 		return nil, err
 	}
-	c := &CustomerLabelClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultCustomerLabelCallOptions(),
+	client := CustomerLabelClient{CallOptions: defaultCustomerLabelCallOptions()}
 
+	c := &customerLabelGRPCClient{
+		connPool:            connPool,
+		disableDeadlines:    disableDeadlines,
 		customerLabelClient: servicespb.NewCustomerLabelServiceClient(connPool),
+		CallOptions:         &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *CustomerLabelClient) Connection() *grpc.ClientConn {
+func (c *customerLabelGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *CustomerLabelClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *CustomerLabelClient) setGoogleClientInfo(keyval ...string) {
+func (c *customerLabelGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// GetCustomerLabel returns the requested customer-label relationship in full detail.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *CustomerLabelClient) GetCustomerLabel(ctx context.Context, req *servicespb.GetCustomerLabelRequest, opts ...gax.CallOption) (*resourcespb.CustomerLabel, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *customerLabelGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *customerLabelGRPCClient) GetCustomerLabel(ctx context.Context, req *servicespb.GetCustomerLabelRequest, opts ...gax.CallOption) (*resourcespb.CustomerLabel, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -177,7 +245,7 @@ func (c *CustomerLabelClient) GetCustomerLabel(ctx context.Context, req *service
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetCustomerLabel[0:len(c.CallOptions.GetCustomerLabel):len(c.CallOptions.GetCustomerLabel)], opts...)
+	opts = append((*c.CallOptions).GetCustomerLabel[0:len((*c.CallOptions).GetCustomerLabel):len((*c.CallOptions).GetCustomerLabel)], opts...)
 	var resp *resourcespb.CustomerLabel
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
@@ -190,20 +258,7 @@ func (c *CustomerLabelClient) GetCustomerLabel(ctx context.Context, req *service
 	return resp, nil
 }
 
-// MutateCustomerLabels creates and removes customer-label relationships.
-// Operation statuses are returned.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// DatabaseError (at )
-// HeaderError (at )
-// InternalError (at )
-// LabelError (at )
-// MutateError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *CustomerLabelClient) MutateCustomerLabels(ctx context.Context, req *servicespb.MutateCustomerLabelsRequest, opts ...gax.CallOption) (*servicespb.MutateCustomerLabelsResponse, error) {
+func (c *customerLabelGRPCClient) MutateCustomerLabels(ctx context.Context, req *servicespb.MutateCustomerLabelsRequest, opts ...gax.CallOption) (*servicespb.MutateCustomerLabelsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -211,7 +266,7 @@ func (c *CustomerLabelClient) MutateCustomerLabels(ctx context.Context, req *ser
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateCustomerLabels[0:len(c.CallOptions.MutateCustomerLabels):len(c.CallOptions.MutateCustomerLabels)], opts...)
+	opts = append((*c.CallOptions).MutateCustomerLabels[0:len((*c.CallOptions).MutateCustomerLabels):len((*c.CallOptions).MutateCustomerLabels)], opts...)
 	var resp *servicespb.MutateCustomerLabelsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

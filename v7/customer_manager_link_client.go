@@ -43,12 +43,13 @@ type CustomerManagerLinkCallOptions struct {
 	MoveManagerLink           []gax.CallOption
 }
 
-func defaultCustomerManagerLinkClientOptions() []option.ClientOption {
+func defaultCustomerManagerLinkGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -96,81 +97,48 @@ func defaultCustomerManagerLinkCallOptions() *CustomerManagerLinkCallOptions {
 	}
 }
 
+// internalCustomerManagerLinkClient is an interface that defines the methods availaible from Google Ads API.
+type internalCustomerManagerLinkClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetCustomerManagerLink(context.Context, *servicespb.GetCustomerManagerLinkRequest, ...gax.CallOption) (*resourcespb.CustomerManagerLink, error)
+	MutateCustomerManagerLink(context.Context, *servicespb.MutateCustomerManagerLinkRequest, ...gax.CallOption) (*servicespb.MutateCustomerManagerLinkResponse, error)
+	MoveManagerLink(context.Context, *servicespb.MoveManagerLinkRequest, ...gax.CallOption) (*servicespb.MoveManagerLinkResponse, error)
+}
+
 // CustomerManagerLinkClient is a client for interacting with Google Ads API.
-//
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage customer-manager links.
 type CustomerManagerLinkClient struct {
-	// Connection pool of gRPC connections to the service.
-	connPool gtransport.ConnPool
-
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
-	// The gRPC API client.
-	customerManagerLinkClient servicespb.CustomerManagerLinkServiceClient
+	// The internal transport-dependent client.
+	internalClient internalCustomerManagerLinkClient
 
 	// The call options for this service.
 	CallOptions *CustomerManagerLinkCallOptions
-
-	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
 }
 
-// NewCustomerManagerLinkClient creates a new customer manager link service client.
-//
-// Service to manage customer-manager links.
-func NewCustomerManagerLinkClient(ctx context.Context, opts ...option.ClientOption) (*CustomerManagerLinkClient, error) {
-	clientOpts := defaultCustomerManagerLinkClientOptions()
-
-	if newCustomerManagerLinkClientHook != nil {
-		hookOpts, err := newCustomerManagerLinkClientHook(ctx, clientHookParams{})
-		if err != nil {
-			return nil, err
-		}
-		clientOpts = append(clientOpts, hookOpts...)
-	}
-
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
-	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
-	if err != nil {
-		return nil, err
-	}
-	c := &CustomerManagerLinkClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultCustomerManagerLinkCallOptions(),
-
-		customerManagerLinkClient: servicespb.NewCustomerManagerLinkServiceClient(connPool),
-	}
-	c.setGoogleClientInfo()
-
-	return c, nil
-}
-
-// Connection returns a connection to the API service.
-//
-// Deprecated.
-func (c *CustomerManagerLinkClient) Connection() *grpc.ClientConn {
-	return c.connPool.Conn()
-}
+// Wrapper methods routed to the internal client.
 
 // Close closes the connection to the API service. The user should invoke this when
 // the client is no longer required.
 func (c *CustomerManagerLinkClient) Close() error {
-	return c.connPool.Close()
+	return c.internalClient.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *CustomerManagerLinkClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *CustomerManagerLinkClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
 }
 
 // GetCustomerManagerLink returns the requested CustomerManagerLink in full detail.
@@ -183,24 +151,7 @@ func (c *CustomerManagerLinkClient) setGoogleClientInfo(keyval ...string) {
 // QuotaError (at )
 // RequestError (at )
 func (c *CustomerManagerLinkClient) GetCustomerManagerLink(ctx context.Context, req *servicespb.GetCustomerManagerLinkRequest, opts ...gax.CallOption) (*resourcespb.CustomerManagerLink, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetCustomerManagerLink[0:len(c.CallOptions.GetCustomerManagerLink):len(c.CallOptions.GetCustomerManagerLink)], opts...)
-	var resp *resourcespb.CustomerManagerLink
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.customerManagerLinkClient.GetCustomerManagerLink(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.GetCustomerManagerLink(ctx, req, opts...)
 }
 
 // MutateCustomerManagerLink creates or updates customer manager links. Operation statuses are returned.
@@ -218,24 +169,7 @@ func (c *CustomerManagerLinkClient) GetCustomerManagerLink(ctx context.Context, 
 // QuotaError (at )
 // RequestError (at )
 func (c *CustomerManagerLinkClient) MutateCustomerManagerLink(ctx context.Context, req *servicespb.MutateCustomerManagerLinkRequest, opts ...gax.CallOption) (*servicespb.MutateCustomerManagerLinkResponse, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateCustomerManagerLink[0:len(c.CallOptions.MutateCustomerManagerLink):len(c.CallOptions.MutateCustomerManagerLink)], opts...)
-	var resp *servicespb.MutateCustomerManagerLinkResponse
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.customerManagerLinkClient.MutateCustomerManagerLink(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.MutateCustomerManagerLink(ctx, req, opts...)
 }
 
 // MoveManagerLink moves a client customer to a new manager customer.
@@ -257,6 +191,111 @@ func (c *CustomerManagerLinkClient) MutateCustomerManagerLink(ctx context.Contex
 // QuotaError (at )
 // RequestError (at )
 func (c *CustomerManagerLinkClient) MoveManagerLink(ctx context.Context, req *servicespb.MoveManagerLinkRequest, opts ...gax.CallOption) (*servicespb.MoveManagerLinkResponse, error) {
+	return c.internalClient.MoveManagerLink(ctx, req, opts...)
+}
+
+// customerManagerLinkGRPCClient is a client for interacting with Google Ads API over gRPC transport.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+type customerManagerLinkGRPCClient struct {
+	// Connection pool of gRPC connections to the service.
+	connPool gtransport.ConnPool
+
+	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
+	disableDeadlines bool
+
+	// Points back to the CallOptions field of the containing CustomerManagerLinkClient
+	CallOptions **CustomerManagerLinkCallOptions
+
+	// The gRPC API client.
+	customerManagerLinkClient servicespb.CustomerManagerLinkServiceClient
+
+	// The x-goog-* metadata to be sent with each request.
+	xGoogMetadata metadata.MD
+}
+
+// NewCustomerManagerLinkClient creates a new customer manager link service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
+//
+// Service to manage customer-manager links.
+func NewCustomerManagerLinkClient(ctx context.Context, opts ...option.ClientOption) (*CustomerManagerLinkClient, error) {
+	clientOpts := defaultCustomerManagerLinkGRPCClientOptions()
+	if newCustomerManagerLinkClientHook != nil {
+		hookOpts, err := newCustomerManagerLinkClientHook(ctx, clientHookParams{})
+		if err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, hookOpts...)
+	}
+
+	disableDeadlines, err := checkDisableDeadlines()
+	if err != nil {
+		return nil, err
+	}
+
+	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
+	if err != nil {
+		return nil, err
+	}
+	client := CustomerManagerLinkClient{CallOptions: defaultCustomerManagerLinkCallOptions()}
+
+	c := &customerManagerLinkGRPCClient{
+		connPool:                  connPool,
+		disableDeadlines:          disableDeadlines,
+		customerManagerLinkClient: servicespb.NewCustomerManagerLinkServiceClient(connPool),
+		CallOptions:               &client.CallOptions,
+	}
+	c.setGoogleClientInfo()
+
+	client.internalClient = c
+
+	return &client, nil
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *customerManagerLinkGRPCClient) Connection() *grpc.ClientConn {
+	return c.connPool.Conn()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *customerManagerLinkGRPCClient) setGoogleClientInfo(keyval ...string) {
+	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+}
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *customerManagerLinkGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *customerManagerLinkGRPCClient) GetCustomerManagerLink(ctx context.Context, req *servicespb.GetCustomerManagerLinkRequest, opts ...gax.CallOption) (*resourcespb.CustomerManagerLink, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).GetCustomerManagerLink[0:len((*c.CallOptions).GetCustomerManagerLink):len((*c.CallOptions).GetCustomerManagerLink)], opts...)
+	var resp *resourcespb.CustomerManagerLink
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.customerManagerLinkClient.GetCustomerManagerLink(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *customerManagerLinkGRPCClient) MutateCustomerManagerLink(ctx context.Context, req *servicespb.MutateCustomerManagerLinkRequest, opts ...gax.CallOption) (*servicespb.MutateCustomerManagerLinkResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -264,7 +303,28 @@ func (c *CustomerManagerLinkClient) MoveManagerLink(ctx context.Context, req *se
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MoveManagerLink[0:len(c.CallOptions.MoveManagerLink):len(c.CallOptions.MoveManagerLink)], opts...)
+	opts = append((*c.CallOptions).MutateCustomerManagerLink[0:len((*c.CallOptions).MutateCustomerManagerLink):len((*c.CallOptions).MutateCustomerManagerLink)], opts...)
+	var resp *servicespb.MutateCustomerManagerLinkResponse
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.customerManagerLinkClient.MutateCustomerManagerLink(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *customerManagerLinkGRPCClient) MoveManagerLink(ctx context.Context, req *servicespb.MoveManagerLinkRequest, opts ...gax.CallOption) (*servicespb.MoveManagerLinkResponse, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).MoveManagerLink[0:len((*c.CallOptions).MoveManagerLink):len((*c.CallOptions).MoveManagerLink)], opts...)
 	var resp *servicespb.MoveManagerLinkResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

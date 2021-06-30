@@ -42,12 +42,13 @@ type UserListCallOptions struct {
 	MutateUserLists []gax.CallOption
 }
 
-func defaultUserListClientOptions() []option.ClientOption {
+func defaultUserListGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -83,81 +84,47 @@ func defaultUserListCallOptions() *UserListCallOptions {
 	}
 }
 
+// internalUserListClient is an interface that defines the methods availaible from Google Ads API.
+type internalUserListClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetUserList(context.Context, *servicespb.GetUserListRequest, ...gax.CallOption) (*resourcespb.UserList, error)
+	MutateUserLists(context.Context, *servicespb.MutateUserListsRequest, ...gax.CallOption) (*servicespb.MutateUserListsResponse, error)
+}
+
 // UserListClient is a client for interacting with Google Ads API.
-//
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage user lists.
 type UserListClient struct {
-	// Connection pool of gRPC connections to the service.
-	connPool gtransport.ConnPool
-
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
-	// The gRPC API client.
-	userListClient servicespb.UserListServiceClient
+	// The internal transport-dependent client.
+	internalClient internalUserListClient
 
 	// The call options for this service.
 	CallOptions *UserListCallOptions
-
-	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
 }
 
-// NewUserListClient creates a new user list service client.
-//
-// Service to manage user lists.
-func NewUserListClient(ctx context.Context, opts ...option.ClientOption) (*UserListClient, error) {
-	clientOpts := defaultUserListClientOptions()
-
-	if newUserListClientHook != nil {
-		hookOpts, err := newUserListClientHook(ctx, clientHookParams{})
-		if err != nil {
-			return nil, err
-		}
-		clientOpts = append(clientOpts, hookOpts...)
-	}
-
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
-	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
-	if err != nil {
-		return nil, err
-	}
-	c := &UserListClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultUserListCallOptions(),
-
-		userListClient: servicespb.NewUserListServiceClient(connPool),
-	}
-	c.setGoogleClientInfo()
-
-	return c, nil
-}
-
-// Connection returns a connection to the API service.
-//
-// Deprecated.
-func (c *UserListClient) Connection() *grpc.ClientConn {
-	return c.connPool.Conn()
-}
+// Wrapper methods routed to the internal client.
 
 // Close closes the connection to the API service. The user should invoke this when
 // the client is no longer required.
 func (c *UserListClient) Close() error {
-	return c.connPool.Close()
+	return c.internalClient.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *UserListClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *UserListClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
 }
 
 // GetUserList returns the requested user list.
@@ -170,24 +137,7 @@ func (c *UserListClient) setGoogleClientInfo(keyval ...string) {
 // QuotaError (at )
 // RequestError (at )
 func (c *UserListClient) GetUserList(ctx context.Context, req *servicespb.GetUserListRequest, opts ...gax.CallOption) (*resourcespb.UserList, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetUserList[0:len(c.CallOptions.GetUserList):len(c.CallOptions.GetUserList)], opts...)
-	var resp *resourcespb.UserList
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.userListClient.GetUserList(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.GetUserList(ctx, req, opts...)
 }
 
 // MutateUserLists creates or updates user lists. Operation statuses are returned.
@@ -214,6 +164,111 @@ func (c *UserListClient) GetUserList(ctx context.Context, req *servicespb.GetUse
 // StringLengthError (at )
 // UserListError (at )
 func (c *UserListClient) MutateUserLists(ctx context.Context, req *servicespb.MutateUserListsRequest, opts ...gax.CallOption) (*servicespb.MutateUserListsResponse, error) {
+	return c.internalClient.MutateUserLists(ctx, req, opts...)
+}
+
+// userListGRPCClient is a client for interacting with Google Ads API over gRPC transport.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+type userListGRPCClient struct {
+	// Connection pool of gRPC connections to the service.
+	connPool gtransport.ConnPool
+
+	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
+	disableDeadlines bool
+
+	// Points back to the CallOptions field of the containing UserListClient
+	CallOptions **UserListCallOptions
+
+	// The gRPC API client.
+	userListClient servicespb.UserListServiceClient
+
+	// The x-goog-* metadata to be sent with each request.
+	xGoogMetadata metadata.MD
+}
+
+// NewUserListClient creates a new user list service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
+//
+// Service to manage user lists.
+func NewUserListClient(ctx context.Context, opts ...option.ClientOption) (*UserListClient, error) {
+	clientOpts := defaultUserListGRPCClientOptions()
+	if newUserListClientHook != nil {
+		hookOpts, err := newUserListClientHook(ctx, clientHookParams{})
+		if err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, hookOpts...)
+	}
+
+	disableDeadlines, err := checkDisableDeadlines()
+	if err != nil {
+		return nil, err
+	}
+
+	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
+	if err != nil {
+		return nil, err
+	}
+	client := UserListClient{CallOptions: defaultUserListCallOptions()}
+
+	c := &userListGRPCClient{
+		connPool:         connPool,
+		disableDeadlines: disableDeadlines,
+		userListClient:   servicespb.NewUserListServiceClient(connPool),
+		CallOptions:      &client.CallOptions,
+	}
+	c.setGoogleClientInfo()
+
+	client.internalClient = c
+
+	return &client, nil
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *userListGRPCClient) Connection() *grpc.ClientConn {
+	return c.connPool.Conn()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *userListGRPCClient) setGoogleClientInfo(keyval ...string) {
+	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+}
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *userListGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *userListGRPCClient) GetUserList(ctx context.Context, req *servicespb.GetUserListRequest, opts ...gax.CallOption) (*resourcespb.UserList, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).GetUserList[0:len((*c.CallOptions).GetUserList):len((*c.CallOptions).GetUserList)], opts...)
+	var resp *resourcespb.UserList
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.userListClient.GetUserList(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *userListGRPCClient) MutateUserLists(ctx context.Context, req *servicespb.MutateUserListsRequest, opts ...gax.CallOption) (*servicespb.MutateUserListsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -221,7 +276,7 @@ func (c *UserListClient) MutateUserLists(ctx context.Context, req *servicespb.Mu
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateUserLists[0:len(c.CallOptions.MutateUserLists):len(c.CallOptions.MutateUserLists)], opts...)
+	opts = append((*c.CallOptions).MutateUserLists[0:len((*c.CallOptions).MutateUserLists):len((*c.CallOptions).MutateUserLists)], opts...)
 	var resp *servicespb.MutateUserListsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

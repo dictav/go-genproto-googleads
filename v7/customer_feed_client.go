@@ -42,12 +42,13 @@ type CustomerFeedCallOptions struct {
 	MutateCustomerFeeds []gax.CallOption
 }
 
-func defaultCustomerFeedClientOptions() []option.ClientOption {
+func defaultCustomerFeedGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -83,81 +84,47 @@ func defaultCustomerFeedCallOptions() *CustomerFeedCallOptions {
 	}
 }
 
+// internalCustomerFeedClient is an interface that defines the methods availaible from Google Ads API.
+type internalCustomerFeedClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetCustomerFeed(context.Context, *servicespb.GetCustomerFeedRequest, ...gax.CallOption) (*resourcespb.CustomerFeed, error)
+	MutateCustomerFeeds(context.Context, *servicespb.MutateCustomerFeedsRequest, ...gax.CallOption) (*servicespb.MutateCustomerFeedsResponse, error)
+}
+
 // CustomerFeedClient is a client for interacting with Google Ads API.
-//
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage customer feeds.
 type CustomerFeedClient struct {
-	// Connection pool of gRPC connections to the service.
-	connPool gtransport.ConnPool
-
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
-	// The gRPC API client.
-	customerFeedClient servicespb.CustomerFeedServiceClient
+	// The internal transport-dependent client.
+	internalClient internalCustomerFeedClient
 
 	// The call options for this service.
 	CallOptions *CustomerFeedCallOptions
-
-	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
 }
 
-// NewCustomerFeedClient creates a new customer feed service client.
-//
-// Service to manage customer feeds.
-func NewCustomerFeedClient(ctx context.Context, opts ...option.ClientOption) (*CustomerFeedClient, error) {
-	clientOpts := defaultCustomerFeedClientOptions()
-
-	if newCustomerFeedClientHook != nil {
-		hookOpts, err := newCustomerFeedClientHook(ctx, clientHookParams{})
-		if err != nil {
-			return nil, err
-		}
-		clientOpts = append(clientOpts, hookOpts...)
-	}
-
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
-	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
-	if err != nil {
-		return nil, err
-	}
-	c := &CustomerFeedClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultCustomerFeedCallOptions(),
-
-		customerFeedClient: servicespb.NewCustomerFeedServiceClient(connPool),
-	}
-	c.setGoogleClientInfo()
-
-	return c, nil
-}
-
-// Connection returns a connection to the API service.
-//
-// Deprecated.
-func (c *CustomerFeedClient) Connection() *grpc.ClientConn {
-	return c.connPool.Conn()
-}
+// Wrapper methods routed to the internal client.
 
 // Close closes the connection to the API service. The user should invoke this when
 // the client is no longer required.
 func (c *CustomerFeedClient) Close() error {
-	return c.connPool.Close()
+	return c.internalClient.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *CustomerFeedClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *CustomerFeedClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
 }
 
 // GetCustomerFeed returns the requested customer feed in full detail.
@@ -170,24 +137,7 @@ func (c *CustomerFeedClient) setGoogleClientInfo(keyval ...string) {
 // QuotaError (at )
 // RequestError (at )
 func (c *CustomerFeedClient) GetCustomerFeed(ctx context.Context, req *servicespb.GetCustomerFeedRequest, opts ...gax.CallOption) (*resourcespb.CustomerFeed, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetCustomerFeed[0:len(c.CallOptions.GetCustomerFeed):len(c.CallOptions.GetCustomerFeed)], opts...)
-	var resp *resourcespb.CustomerFeed
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.customerFeedClient.GetCustomerFeed(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.GetCustomerFeed(ctx, req, opts...)
 }
 
 // MutateCustomerFeeds creates, updates, or removes customer feeds. Operation statuses are
@@ -217,6 +167,111 @@ func (c *CustomerFeedClient) GetCustomerFeed(ctx context.Context, req *servicesp
 // StringFormatError (at )
 // StringLengthError (at )
 func (c *CustomerFeedClient) MutateCustomerFeeds(ctx context.Context, req *servicespb.MutateCustomerFeedsRequest, opts ...gax.CallOption) (*servicespb.MutateCustomerFeedsResponse, error) {
+	return c.internalClient.MutateCustomerFeeds(ctx, req, opts...)
+}
+
+// customerFeedGRPCClient is a client for interacting with Google Ads API over gRPC transport.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+type customerFeedGRPCClient struct {
+	// Connection pool of gRPC connections to the service.
+	connPool gtransport.ConnPool
+
+	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
+	disableDeadlines bool
+
+	// Points back to the CallOptions field of the containing CustomerFeedClient
+	CallOptions **CustomerFeedCallOptions
+
+	// The gRPC API client.
+	customerFeedClient servicespb.CustomerFeedServiceClient
+
+	// The x-goog-* metadata to be sent with each request.
+	xGoogMetadata metadata.MD
+}
+
+// NewCustomerFeedClient creates a new customer feed service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
+//
+// Service to manage customer feeds.
+func NewCustomerFeedClient(ctx context.Context, opts ...option.ClientOption) (*CustomerFeedClient, error) {
+	clientOpts := defaultCustomerFeedGRPCClientOptions()
+	if newCustomerFeedClientHook != nil {
+		hookOpts, err := newCustomerFeedClientHook(ctx, clientHookParams{})
+		if err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, hookOpts...)
+	}
+
+	disableDeadlines, err := checkDisableDeadlines()
+	if err != nil {
+		return nil, err
+	}
+
+	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
+	if err != nil {
+		return nil, err
+	}
+	client := CustomerFeedClient{CallOptions: defaultCustomerFeedCallOptions()}
+
+	c := &customerFeedGRPCClient{
+		connPool:           connPool,
+		disableDeadlines:   disableDeadlines,
+		customerFeedClient: servicespb.NewCustomerFeedServiceClient(connPool),
+		CallOptions:        &client.CallOptions,
+	}
+	c.setGoogleClientInfo()
+
+	client.internalClient = c
+
+	return &client, nil
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *customerFeedGRPCClient) Connection() *grpc.ClientConn {
+	return c.connPool.Conn()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *customerFeedGRPCClient) setGoogleClientInfo(keyval ...string) {
+	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+}
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *customerFeedGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *customerFeedGRPCClient) GetCustomerFeed(ctx context.Context, req *servicespb.GetCustomerFeedRequest, opts ...gax.CallOption) (*resourcespb.CustomerFeed, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).GetCustomerFeed[0:len((*c.CallOptions).GetCustomerFeed):len((*c.CallOptions).GetCustomerFeed)], opts...)
+	var resp *resourcespb.CustomerFeed
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.customerFeedClient.GetCustomerFeed(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *customerFeedGRPCClient) MutateCustomerFeeds(ctx context.Context, req *servicespb.MutateCustomerFeedsRequest, opts ...gax.CallOption) (*servicespb.MutateCustomerFeedsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -224,7 +279,7 @@ func (c *CustomerFeedClient) MutateCustomerFeeds(ctx context.Context, req *servi
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateCustomerFeeds[0:len(c.CallOptions.MutateCustomerFeeds):len(c.CallOptions.MutateCustomerFeeds)], opts...)
+	opts = append((*c.CallOptions).MutateCustomerFeeds[0:len((*c.CallOptions).MutateCustomerFeeds):len((*c.CallOptions).MutateCustomerFeeds)], opts...)
 	var resp *servicespb.MutateCustomerFeedsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

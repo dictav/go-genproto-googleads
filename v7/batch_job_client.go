@@ -25,7 +25,6 @@ import (
 
 	"cloud.google.com/go/longrunning"
 	lroauto "cloud.google.com/go/longrunning/autogen"
-	"github.com/golang/protobuf/proto"
 	gax "github.com/googleapis/gax-go/v2"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -37,6 +36,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/proto"
 )
 
 var newBatchJobClientHook clientHook
@@ -50,12 +50,13 @@ type BatchJobCallOptions struct {
 	AddBatchJobOperations []gax.CallOption
 }
 
-func defaultBatchJobClientOptions() []option.ClientOption {
+func defaultBatchJobGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -127,37 +128,170 @@ func defaultBatchJobCallOptions() *BatchJobCallOptions {
 	}
 }
 
+// internalBatchJobClient is an interface that defines the methods availaible from Google Ads API.
+type internalBatchJobClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	MutateBatchJob(context.Context, *servicespb.MutateBatchJobRequest, ...gax.CallOption) (*servicespb.MutateBatchJobResponse, error)
+	GetBatchJob(context.Context, *servicespb.GetBatchJobRequest, ...gax.CallOption) (*resourcespb.BatchJob, error)
+	ListBatchJobResults(context.Context, *servicespb.ListBatchJobResultsRequest, ...gax.CallOption) *BatchJobResultIterator
+	RunBatchJob(context.Context, *servicespb.RunBatchJobRequest, ...gax.CallOption) (*RunBatchJobOperation, error)
+	RunBatchJobOperation(name string) *RunBatchJobOperation
+	AddBatchJobOperations(context.Context, *servicespb.AddBatchJobOperationsRequest, ...gax.CallOption) (*servicespb.AddBatchJobOperationsResponse, error)
+}
+
 // BatchJobClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage batch jobs.
+type BatchJobClient struct {
+	// The internal transport-dependent client.
+	internalClient internalBatchJobClient
+
+	// The call options for this service.
+	CallOptions *BatchJobCallOptions
+
+	// LROClient is used internally to handle long-running operations.
+	// It is exposed so that its CallOptions can be modified if required.
+	// Users should not Close this client.
+	LROClient *lroauto.OperationsClient
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *BatchJobClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *BatchJobClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *BatchJobClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// MutateBatchJob mutates a batch job.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+// ResourceCountLimitExceededError (at )
+func (c *BatchJobClient) MutateBatchJob(ctx context.Context, req *servicespb.MutateBatchJobRequest, opts ...gax.CallOption) (*servicespb.MutateBatchJobResponse, error) {
+	return c.internalClient.MutateBatchJob(ctx, req, opts...)
+}
+
+// GetBatchJob returns the batch job.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *BatchJobClient) GetBatchJob(ctx context.Context, req *servicespb.GetBatchJobRequest, opts ...gax.CallOption) (*resourcespb.BatchJob, error) {
+	return c.internalClient.GetBatchJob(ctx, req, opts...)
+}
+
+// ListBatchJobResults returns the results of the batch job. The job must be done.
+// Supports standard list paging.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// BatchJobError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *BatchJobClient) ListBatchJobResults(ctx context.Context, req *servicespb.ListBatchJobResultsRequest, opts ...gax.CallOption) *BatchJobResultIterator {
+	return c.internalClient.ListBatchJobResults(ctx, req, opts...)
+}
+
+// RunBatchJob runs the batch job.
+//
+// The Operation.metadata field type is BatchJobMetadata. When finished, the
+// long running operation will not contain errors or a response. Instead, use
+// ListBatchJobResults to get the results of the job.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// BatchJobError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *BatchJobClient) RunBatchJob(ctx context.Context, req *servicespb.RunBatchJobRequest, opts ...gax.CallOption) (*RunBatchJobOperation, error) {
+	return c.internalClient.RunBatchJob(ctx, req, opts...)
+}
+
+// RunBatchJobOperation returns a new RunBatchJobOperation from a given name.
+// The name must be that of a previously created RunBatchJobOperation, possibly from a different process.
+func (c *BatchJobClient) RunBatchJobOperation(name string) *RunBatchJobOperation {
+	return c.internalClient.RunBatchJobOperation(name)
+}
+
+// AddBatchJobOperations add operations to the batch job.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// BatchJobError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+// ResourceCountLimitExceededError (at )
+func (c *BatchJobClient) AddBatchJobOperations(ctx context.Context, req *servicespb.AddBatchJobOperationsRequest, opts ...gax.CallOption) (*servicespb.AddBatchJobOperationsResponse, error) {
+	return c.internalClient.AddBatchJobOperations(ctx, req, opts...)
+}
+
+// batchJobGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type BatchJobClient struct {
+type batchJobGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing BatchJobClient
+	CallOptions **BatchJobCallOptions
+
 	// The gRPC API client.
 	batchJobClient servicespb.BatchJobServiceClient
 
-	// LROClient is used internally to handle longrunning operations.
+	// LROClient is used internally to handle long-running operations.
 	// It is exposed so that its CallOptions can be modified if required.
 	// Users should not Close this client.
-	LROClient *lroauto.OperationsClient
-
-	// The call options for this service.
-	CallOptions *BatchJobCallOptions
+	LROClient **lroauto.OperationsClient
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewBatchJobClient creates a new batch job service client.
+// NewBatchJobClient creates a new batch job service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // Service to manage batch jobs.
 func NewBatchJobClient(ctx context.Context, opts ...option.ClientOption) (*BatchJobClient, error) {
-	clientOpts := defaultBatchJobClientOptions()
-
+	clientOpts := defaultBatchJobGRPCClientOptions()
 	if newBatchJobClientHook != nil {
 		hookOpts, err := newBatchJobClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -175,16 +309,19 @@ func NewBatchJobClient(ctx context.Context, opts ...option.ClientOption) (*Batch
 	if err != nil {
 		return nil, err
 	}
-	c := &BatchJobClient{
+	client := BatchJobClient{CallOptions: defaultBatchJobCallOptions()}
+
+	c := &batchJobGRPCClient{
 		connPool:         connPool,
 		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultBatchJobCallOptions(),
-
-		batchJobClient: servicespb.NewBatchJobServiceClient(connPool),
+		batchJobClient:   servicespb.NewBatchJobServiceClient(connPool),
+		CallOptions:      &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	c.LROClient, err = lroauto.NewOperationsClient(ctx, gtransport.WithConnPool(connPool))
+	client.internalClient = c
+
+	client.LROClient, err = lroauto.NewOperationsClient(ctx, gtransport.WithConnPool(connPool))
 	if err != nil {
 		// This error "should not happen", since we are just reusing old connection pool
 		// and never actually need to dial.
@@ -194,42 +331,33 @@ func NewBatchJobClient(ctx context.Context, opts ...option.ClientOption) (*Batch
 		// TODO: investigate error conditions.
 		return nil, err
 	}
-	return c, nil
+	c.LROClient = &client.LROClient
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *BatchJobClient) Connection() *grpc.ClientConn {
+func (c *batchJobGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *BatchJobClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *BatchJobClient) setGoogleClientInfo(keyval ...string) {
+func (c *batchJobGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// MutateBatchJob mutates a batch job.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-// ResourceCountLimitExceededError (at )
-func (c *BatchJobClient) MutateBatchJob(ctx context.Context, req *servicespb.MutateBatchJobRequest, opts ...gax.CallOption) (*servicespb.MutateBatchJobResponse, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *batchJobGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *batchJobGRPCClient) MutateBatchJob(ctx context.Context, req *servicespb.MutateBatchJobRequest, opts ...gax.CallOption) (*servicespb.MutateBatchJobResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -237,7 +365,7 @@ func (c *BatchJobClient) MutateBatchJob(ctx context.Context, req *servicespb.Mut
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateBatchJob[0:len(c.CallOptions.MutateBatchJob):len(c.CallOptions.MutateBatchJob)], opts...)
+	opts = append((*c.CallOptions).MutateBatchJob[0:len((*c.CallOptions).MutateBatchJob):len((*c.CallOptions).MutateBatchJob)], opts...)
 	var resp *servicespb.MutateBatchJobResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
@@ -250,16 +378,7 @@ func (c *BatchJobClient) MutateBatchJob(ctx context.Context, req *servicespb.Mut
 	return resp, nil
 }
 
-// GetBatchJob returns the batch job.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *BatchJobClient) GetBatchJob(ctx context.Context, req *servicespb.GetBatchJobRequest, opts ...gax.CallOption) (*resourcespb.BatchJob, error) {
+func (c *batchJobGRPCClient) GetBatchJob(ctx context.Context, req *servicespb.GetBatchJobRequest, opts ...gax.CallOption) (*resourcespb.BatchJob, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -267,7 +386,7 @@ func (c *BatchJobClient) GetBatchJob(ctx context.Context, req *servicespb.GetBat
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetBatchJob[0:len(c.CallOptions.GetBatchJob):len(c.CallOptions.GetBatchJob)], opts...)
+	opts = append((*c.CallOptions).GetBatchJob[0:len((*c.CallOptions).GetBatchJob):len((*c.CallOptions).GetBatchJob)], opts...)
 	var resp *resourcespb.BatchJob
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
@@ -280,21 +399,10 @@ func (c *BatchJobClient) GetBatchJob(ctx context.Context, req *servicespb.GetBat
 	return resp, nil
 }
 
-// ListBatchJobResults returns the results of the batch job. The job must be done.
-// Supports standard list paging.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// BatchJobError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *BatchJobClient) ListBatchJobResults(ctx context.Context, req *servicespb.ListBatchJobResultsRequest, opts ...gax.CallOption) *BatchJobResultIterator {
+func (c *batchJobGRPCClient) ListBatchJobResults(ctx context.Context, req *servicespb.ListBatchJobResultsRequest, opts ...gax.CallOption) *BatchJobResultIterator {
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.ListBatchJobResults[0:len(c.CallOptions.ListBatchJobResults):len(c.CallOptions.ListBatchJobResults)], opts...)
+	opts = append((*c.CallOptions).ListBatchJobResults[0:len((*c.CallOptions).ListBatchJobResults):len((*c.CallOptions).ListBatchJobResults)], opts...)
 	it := &BatchJobResultIterator{}
 	req = proto.Clone(req).(*servicespb.ListBatchJobResultsRequest)
 	it.InternalFetch = func(pageSize int, pageToken string) ([]*servicespb.BatchJobResult, string, error) {
@@ -331,21 +439,7 @@ func (c *BatchJobClient) ListBatchJobResults(ctx context.Context, req *servicesp
 	return it
 }
 
-// RunBatchJob runs the batch job.
-//
-// The Operation.metadata field type is BatchJobMetadata. When finished, the
-// long running operation will not contain errors or a response. Instead, use
-// ListBatchJobResults to get the results of the job.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// BatchJobError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *BatchJobClient) RunBatchJob(ctx context.Context, req *servicespb.RunBatchJobRequest, opts ...gax.CallOption) (*RunBatchJobOperation, error) {
+func (c *batchJobGRPCClient) RunBatchJob(ctx context.Context, req *servicespb.RunBatchJobRequest, opts ...gax.CallOption) (*RunBatchJobOperation, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -353,7 +447,7 @@ func (c *BatchJobClient) RunBatchJob(ctx context.Context, req *servicespb.RunBat
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.RunBatchJob[0:len(c.CallOptions.RunBatchJob):len(c.CallOptions.RunBatchJob)], opts...)
+	opts = append((*c.CallOptions).RunBatchJob[0:len((*c.CallOptions).RunBatchJob):len((*c.CallOptions).RunBatchJob)], opts...)
 	var resp *longrunningpb.Operation
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
@@ -364,22 +458,11 @@ func (c *BatchJobClient) RunBatchJob(ctx context.Context, req *servicespb.RunBat
 		return nil, err
 	}
 	return &RunBatchJobOperation{
-		lro: longrunning.InternalNewOperation(c.LROClient, resp),
+		lro: longrunning.InternalNewOperation(*c.LROClient, resp),
 	}, nil
 }
 
-// AddBatchJobOperations add operations to the batch job.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// BatchJobError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-// ResourceCountLimitExceededError (at )
-func (c *BatchJobClient) AddBatchJobOperations(ctx context.Context, req *servicespb.AddBatchJobOperationsRequest, opts ...gax.CallOption) (*servicespb.AddBatchJobOperationsResponse, error) {
+func (c *batchJobGRPCClient) AddBatchJobOperations(ctx context.Context, req *servicespb.AddBatchJobOperationsRequest, opts ...gax.CallOption) (*servicespb.AddBatchJobOperationsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -387,7 +470,7 @@ func (c *BatchJobClient) AddBatchJobOperations(ctx context.Context, req *service
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.AddBatchJobOperations[0:len(c.CallOptions.AddBatchJobOperations):len(c.CallOptions.AddBatchJobOperations)], opts...)
+	opts = append((*c.CallOptions).AddBatchJobOperations[0:len((*c.CallOptions).AddBatchJobOperations):len((*c.CallOptions).AddBatchJobOperations)], opts...)
 	var resp *servicespb.AddBatchJobOperationsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
@@ -407,9 +490,9 @@ type RunBatchJobOperation struct {
 
 // RunBatchJobOperation returns a new RunBatchJobOperation from a given name.
 // The name must be that of a previously created RunBatchJobOperation, possibly from a different process.
-func (c *BatchJobClient) RunBatchJobOperation(name string) *RunBatchJobOperation {
+func (c *batchJobGRPCClient) RunBatchJobOperation(name string) *RunBatchJobOperation {
 	return &RunBatchJobOperation{
-		lro: longrunning.InternalNewOperation(c.LROClient, &longrunningpb.Operation{Name: name}),
+		lro: longrunning.InternalNewOperation(*c.LROClient, &longrunningpb.Operation{Name: name}),
 	}
 }
 

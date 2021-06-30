@@ -42,12 +42,13 @@ type KeywordPlanCampaignCallOptions struct {
 	MutateKeywordPlanCampaigns []gax.CallOption
 }
 
-func defaultKeywordPlanCampaignClientOptions() []option.ClientOption {
+func defaultKeywordPlanCampaignGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -83,81 +84,47 @@ func defaultKeywordPlanCampaignCallOptions() *KeywordPlanCampaignCallOptions {
 	}
 }
 
+// internalKeywordPlanCampaignClient is an interface that defines the methods availaible from Google Ads API.
+type internalKeywordPlanCampaignClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetKeywordPlanCampaign(context.Context, *servicespb.GetKeywordPlanCampaignRequest, ...gax.CallOption) (*resourcespb.KeywordPlanCampaign, error)
+	MutateKeywordPlanCampaigns(context.Context, *servicespb.MutateKeywordPlanCampaignsRequest, ...gax.CallOption) (*servicespb.MutateKeywordPlanCampaignsResponse, error)
+}
+
 // KeywordPlanCampaignClient is a client for interacting with Google Ads API.
-//
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage Keyword Plan campaigns.
 type KeywordPlanCampaignClient struct {
-	// Connection pool of gRPC connections to the service.
-	connPool gtransport.ConnPool
-
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
-	// The gRPC API client.
-	keywordPlanCampaignClient servicespb.KeywordPlanCampaignServiceClient
+	// The internal transport-dependent client.
+	internalClient internalKeywordPlanCampaignClient
 
 	// The call options for this service.
 	CallOptions *KeywordPlanCampaignCallOptions
-
-	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
 }
 
-// NewKeywordPlanCampaignClient creates a new keyword plan campaign service client.
-//
-// Service to manage Keyword Plan campaigns.
-func NewKeywordPlanCampaignClient(ctx context.Context, opts ...option.ClientOption) (*KeywordPlanCampaignClient, error) {
-	clientOpts := defaultKeywordPlanCampaignClientOptions()
-
-	if newKeywordPlanCampaignClientHook != nil {
-		hookOpts, err := newKeywordPlanCampaignClientHook(ctx, clientHookParams{})
-		if err != nil {
-			return nil, err
-		}
-		clientOpts = append(clientOpts, hookOpts...)
-	}
-
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
-	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
-	if err != nil {
-		return nil, err
-	}
-	c := &KeywordPlanCampaignClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultKeywordPlanCampaignCallOptions(),
-
-		keywordPlanCampaignClient: servicespb.NewKeywordPlanCampaignServiceClient(connPool),
-	}
-	c.setGoogleClientInfo()
-
-	return c, nil
-}
-
-// Connection returns a connection to the API service.
-//
-// Deprecated.
-func (c *KeywordPlanCampaignClient) Connection() *grpc.ClientConn {
-	return c.connPool.Conn()
-}
+// Wrapper methods routed to the internal client.
 
 // Close closes the connection to the API service. The user should invoke this when
 // the client is no longer required.
 func (c *KeywordPlanCampaignClient) Close() error {
-	return c.connPool.Close()
+	return c.internalClient.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *KeywordPlanCampaignClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *KeywordPlanCampaignClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
 }
 
 // GetKeywordPlanCampaign returns the requested Keyword Plan campaign in full detail.
@@ -170,24 +137,7 @@ func (c *KeywordPlanCampaignClient) setGoogleClientInfo(keyval ...string) {
 // QuotaError (at )
 // RequestError (at )
 func (c *KeywordPlanCampaignClient) GetKeywordPlanCampaign(ctx context.Context, req *servicespb.GetKeywordPlanCampaignRequest, opts ...gax.CallOption) (*resourcespb.KeywordPlanCampaign, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetKeywordPlanCampaign[0:len(c.CallOptions.GetKeywordPlanCampaign):len(c.CallOptions.GetKeywordPlanCampaign)], opts...)
-	var resp *resourcespb.KeywordPlanCampaign
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.keywordPlanCampaignClient.GetKeywordPlanCampaign(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.GetKeywordPlanCampaign(ctx, req, opts...)
 }
 
 // MutateKeywordPlanCampaigns creates, updates, or removes Keyword Plan campaigns. Operation statuses are
@@ -210,6 +160,111 @@ func (c *KeywordPlanCampaignClient) GetKeywordPlanCampaign(ctx context.Context, 
 // RequestError (at )
 // ResourceCountLimitExceededError (at )
 func (c *KeywordPlanCampaignClient) MutateKeywordPlanCampaigns(ctx context.Context, req *servicespb.MutateKeywordPlanCampaignsRequest, opts ...gax.CallOption) (*servicespb.MutateKeywordPlanCampaignsResponse, error) {
+	return c.internalClient.MutateKeywordPlanCampaigns(ctx, req, opts...)
+}
+
+// keywordPlanCampaignGRPCClient is a client for interacting with Google Ads API over gRPC transport.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+type keywordPlanCampaignGRPCClient struct {
+	// Connection pool of gRPC connections to the service.
+	connPool gtransport.ConnPool
+
+	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
+	disableDeadlines bool
+
+	// Points back to the CallOptions field of the containing KeywordPlanCampaignClient
+	CallOptions **KeywordPlanCampaignCallOptions
+
+	// The gRPC API client.
+	keywordPlanCampaignClient servicespb.KeywordPlanCampaignServiceClient
+
+	// The x-goog-* metadata to be sent with each request.
+	xGoogMetadata metadata.MD
+}
+
+// NewKeywordPlanCampaignClient creates a new keyword plan campaign service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
+//
+// Service to manage Keyword Plan campaigns.
+func NewKeywordPlanCampaignClient(ctx context.Context, opts ...option.ClientOption) (*KeywordPlanCampaignClient, error) {
+	clientOpts := defaultKeywordPlanCampaignGRPCClientOptions()
+	if newKeywordPlanCampaignClientHook != nil {
+		hookOpts, err := newKeywordPlanCampaignClientHook(ctx, clientHookParams{})
+		if err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, hookOpts...)
+	}
+
+	disableDeadlines, err := checkDisableDeadlines()
+	if err != nil {
+		return nil, err
+	}
+
+	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
+	if err != nil {
+		return nil, err
+	}
+	client := KeywordPlanCampaignClient{CallOptions: defaultKeywordPlanCampaignCallOptions()}
+
+	c := &keywordPlanCampaignGRPCClient{
+		connPool:                  connPool,
+		disableDeadlines:          disableDeadlines,
+		keywordPlanCampaignClient: servicespb.NewKeywordPlanCampaignServiceClient(connPool),
+		CallOptions:               &client.CallOptions,
+	}
+	c.setGoogleClientInfo()
+
+	client.internalClient = c
+
+	return &client, nil
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *keywordPlanCampaignGRPCClient) Connection() *grpc.ClientConn {
+	return c.connPool.Conn()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *keywordPlanCampaignGRPCClient) setGoogleClientInfo(keyval ...string) {
+	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+}
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *keywordPlanCampaignGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *keywordPlanCampaignGRPCClient) GetKeywordPlanCampaign(ctx context.Context, req *servicespb.GetKeywordPlanCampaignRequest, opts ...gax.CallOption) (*resourcespb.KeywordPlanCampaign, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).GetKeywordPlanCampaign[0:len((*c.CallOptions).GetKeywordPlanCampaign):len((*c.CallOptions).GetKeywordPlanCampaign)], opts...)
+	var resp *resourcespb.KeywordPlanCampaign
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.keywordPlanCampaignClient.GetKeywordPlanCampaign(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *keywordPlanCampaignGRPCClient) MutateKeywordPlanCampaigns(ctx context.Context, req *servicespb.MutateKeywordPlanCampaignsRequest, opts ...gax.CallOption) (*servicespb.MutateKeywordPlanCampaignsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -217,7 +272,7 @@ func (c *KeywordPlanCampaignClient) MutateKeywordPlanCampaigns(ctx context.Conte
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateKeywordPlanCampaigns[0:len(c.CallOptions.MutateKeywordPlanCampaigns):len(c.CallOptions.MutateKeywordPlanCampaigns)], opts...)
+	opts = append((*c.CallOptions).MutateKeywordPlanCampaigns[0:len((*c.CallOptions).MutateKeywordPlanCampaigns):len((*c.CallOptions).MutateKeywordPlanCampaigns)], opts...)
 	var resp *servicespb.MutateKeywordPlanCampaignsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

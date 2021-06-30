@@ -42,12 +42,13 @@ type CustomAudienceCallOptions struct {
 	MutateCustomAudiences []gax.CallOption
 }
 
-func defaultCustomAudienceClientOptions() []option.ClientOption {
+func defaultCustomAudienceGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -83,81 +84,47 @@ func defaultCustomAudienceCallOptions() *CustomAudienceCallOptions {
 	}
 }
 
+// internalCustomAudienceClient is an interface that defines the methods availaible from Google Ads API.
+type internalCustomAudienceClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetCustomAudience(context.Context, *servicespb.GetCustomAudienceRequest, ...gax.CallOption) (*resourcespb.CustomAudience, error)
+	MutateCustomAudiences(context.Context, *servicespb.MutateCustomAudiencesRequest, ...gax.CallOption) (*servicespb.MutateCustomAudiencesResponse, error)
+}
+
 // CustomAudienceClient is a client for interacting with Google Ads API.
-//
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage custom audiences.
 type CustomAudienceClient struct {
-	// Connection pool of gRPC connections to the service.
-	connPool gtransport.ConnPool
-
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
-	// The gRPC API client.
-	customAudienceClient servicespb.CustomAudienceServiceClient
+	// The internal transport-dependent client.
+	internalClient internalCustomAudienceClient
 
 	// The call options for this service.
 	CallOptions *CustomAudienceCallOptions
-
-	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
 }
 
-// NewCustomAudienceClient creates a new custom audience service client.
-//
-// Service to manage custom audiences.
-func NewCustomAudienceClient(ctx context.Context, opts ...option.ClientOption) (*CustomAudienceClient, error) {
-	clientOpts := defaultCustomAudienceClientOptions()
-
-	if newCustomAudienceClientHook != nil {
-		hookOpts, err := newCustomAudienceClientHook(ctx, clientHookParams{})
-		if err != nil {
-			return nil, err
-		}
-		clientOpts = append(clientOpts, hookOpts...)
-	}
-
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
-	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
-	if err != nil {
-		return nil, err
-	}
-	c := &CustomAudienceClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultCustomAudienceCallOptions(),
-
-		customAudienceClient: servicespb.NewCustomAudienceServiceClient(connPool),
-	}
-	c.setGoogleClientInfo()
-
-	return c, nil
-}
-
-// Connection returns a connection to the API service.
-//
-// Deprecated.
-func (c *CustomAudienceClient) Connection() *grpc.ClientConn {
-	return c.connPool.Conn()
-}
+// Wrapper methods routed to the internal client.
 
 // Close closes the connection to the API service. The user should invoke this when
 // the client is no longer required.
 func (c *CustomAudienceClient) Close() error {
-	return c.connPool.Close()
+	return c.internalClient.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *CustomAudienceClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *CustomAudienceClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
 }
 
 // GetCustomAudience returns the requested custom audience in full detail.
@@ -170,24 +137,7 @@ func (c *CustomAudienceClient) setGoogleClientInfo(keyval ...string) {
 // QuotaError (at )
 // RequestError (at )
 func (c *CustomAudienceClient) GetCustomAudience(ctx context.Context, req *servicespb.GetCustomAudienceRequest, opts ...gax.CallOption) (*resourcespb.CustomAudience, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetCustomAudience[0:len(c.CallOptions.GetCustomAudience):len(c.CallOptions.GetCustomAudience)], opts...)
-	var resp *resourcespb.CustomAudience
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.customAudienceClient.GetCustomAudience(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.GetCustomAudience(ctx, req, opts...)
 }
 
 // MutateCustomAudiences creates or updates custom audiences. Operation statuses are returned.
@@ -207,6 +157,111 @@ func (c *CustomAudienceClient) GetCustomAudience(ctx context.Context, req *servi
 // QuotaError (at )
 // RequestError (at )
 func (c *CustomAudienceClient) MutateCustomAudiences(ctx context.Context, req *servicespb.MutateCustomAudiencesRequest, opts ...gax.CallOption) (*servicespb.MutateCustomAudiencesResponse, error) {
+	return c.internalClient.MutateCustomAudiences(ctx, req, opts...)
+}
+
+// customAudienceGRPCClient is a client for interacting with Google Ads API over gRPC transport.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+type customAudienceGRPCClient struct {
+	// Connection pool of gRPC connections to the service.
+	connPool gtransport.ConnPool
+
+	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
+	disableDeadlines bool
+
+	// Points back to the CallOptions field of the containing CustomAudienceClient
+	CallOptions **CustomAudienceCallOptions
+
+	// The gRPC API client.
+	customAudienceClient servicespb.CustomAudienceServiceClient
+
+	// The x-goog-* metadata to be sent with each request.
+	xGoogMetadata metadata.MD
+}
+
+// NewCustomAudienceClient creates a new custom audience service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
+//
+// Service to manage custom audiences.
+func NewCustomAudienceClient(ctx context.Context, opts ...option.ClientOption) (*CustomAudienceClient, error) {
+	clientOpts := defaultCustomAudienceGRPCClientOptions()
+	if newCustomAudienceClientHook != nil {
+		hookOpts, err := newCustomAudienceClientHook(ctx, clientHookParams{})
+		if err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, hookOpts...)
+	}
+
+	disableDeadlines, err := checkDisableDeadlines()
+	if err != nil {
+		return nil, err
+	}
+
+	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
+	if err != nil {
+		return nil, err
+	}
+	client := CustomAudienceClient{CallOptions: defaultCustomAudienceCallOptions()}
+
+	c := &customAudienceGRPCClient{
+		connPool:             connPool,
+		disableDeadlines:     disableDeadlines,
+		customAudienceClient: servicespb.NewCustomAudienceServiceClient(connPool),
+		CallOptions:          &client.CallOptions,
+	}
+	c.setGoogleClientInfo()
+
+	client.internalClient = c
+
+	return &client, nil
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *customAudienceGRPCClient) Connection() *grpc.ClientConn {
+	return c.connPool.Conn()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *customAudienceGRPCClient) setGoogleClientInfo(keyval ...string) {
+	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+}
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *customAudienceGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *customAudienceGRPCClient) GetCustomAudience(ctx context.Context, req *servicespb.GetCustomAudienceRequest, opts ...gax.CallOption) (*resourcespb.CustomAudience, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).GetCustomAudience[0:len((*c.CallOptions).GetCustomAudience):len((*c.CallOptions).GetCustomAudience)], opts...)
+	var resp *resourcespb.CustomAudience
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.customAudienceClient.GetCustomAudience(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *customAudienceGRPCClient) MutateCustomAudiences(ctx context.Context, req *servicespb.MutateCustomAudiencesRequest, opts ...gax.CallOption) (*servicespb.MutateCustomAudiencesResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -214,7 +269,7 @@ func (c *CustomAudienceClient) MutateCustomAudiences(ctx context.Context, req *s
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateCustomAudiences[0:len(c.CallOptions.MutateCustomAudiences):len(c.CallOptions.MutateCustomAudiences)], opts...)
+	opts = append((*c.CallOptions).MutateCustomAudiences[0:len((*c.CallOptions).MutateCustomAudiences):len((*c.CallOptions).MutateCustomAudiences)], opts...)
 	var resp *servicespb.MutateCustomAudiencesResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

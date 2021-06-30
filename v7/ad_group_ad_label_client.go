@@ -42,12 +42,13 @@ type AdGroupAdLabelCallOptions struct {
 	MutateAdGroupAdLabels []gax.CallOption
 }
 
-func defaultAdGroupAdLabelClientOptions() []option.ClientOption {
+func defaultAdGroupAdLabelGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -83,81 +84,47 @@ func defaultAdGroupAdLabelCallOptions() *AdGroupAdLabelCallOptions {
 	}
 }
 
+// internalAdGroupAdLabelClient is an interface that defines the methods availaible from Google Ads API.
+type internalAdGroupAdLabelClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetAdGroupAdLabel(context.Context, *servicespb.GetAdGroupAdLabelRequest, ...gax.CallOption) (*resourcespb.AdGroupAdLabel, error)
+	MutateAdGroupAdLabels(context.Context, *servicespb.MutateAdGroupAdLabelsRequest, ...gax.CallOption) (*servicespb.MutateAdGroupAdLabelsResponse, error)
+}
+
 // AdGroupAdLabelClient is a client for interacting with Google Ads API.
-//
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage labels on ad group ads.
 type AdGroupAdLabelClient struct {
-	// Connection pool of gRPC connections to the service.
-	connPool gtransport.ConnPool
-
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
-	// The gRPC API client.
-	adGroupAdLabelClient servicespb.AdGroupAdLabelServiceClient
+	// The internal transport-dependent client.
+	internalClient internalAdGroupAdLabelClient
 
 	// The call options for this service.
 	CallOptions *AdGroupAdLabelCallOptions
-
-	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
 }
 
-// NewAdGroupAdLabelClient creates a new ad group ad label service client.
-//
-// Service to manage labels on ad group ads.
-func NewAdGroupAdLabelClient(ctx context.Context, opts ...option.ClientOption) (*AdGroupAdLabelClient, error) {
-	clientOpts := defaultAdGroupAdLabelClientOptions()
-
-	if newAdGroupAdLabelClientHook != nil {
-		hookOpts, err := newAdGroupAdLabelClientHook(ctx, clientHookParams{})
-		if err != nil {
-			return nil, err
-		}
-		clientOpts = append(clientOpts, hookOpts...)
-	}
-
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
-	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
-	if err != nil {
-		return nil, err
-	}
-	c := &AdGroupAdLabelClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultAdGroupAdLabelCallOptions(),
-
-		adGroupAdLabelClient: servicespb.NewAdGroupAdLabelServiceClient(connPool),
-	}
-	c.setGoogleClientInfo()
-
-	return c, nil
-}
-
-// Connection returns a connection to the API service.
-//
-// Deprecated.
-func (c *AdGroupAdLabelClient) Connection() *grpc.ClientConn {
-	return c.connPool.Conn()
-}
+// Wrapper methods routed to the internal client.
 
 // Close closes the connection to the API service. The user should invoke this when
 // the client is no longer required.
 func (c *AdGroupAdLabelClient) Close() error {
-	return c.connPool.Close()
+	return c.internalClient.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *AdGroupAdLabelClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *AdGroupAdLabelClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
 }
 
 // GetAdGroupAdLabel returns the requested ad group ad label in full detail.
@@ -170,24 +137,7 @@ func (c *AdGroupAdLabelClient) setGoogleClientInfo(keyval ...string) {
 // QuotaError (at )
 // RequestError (at )
 func (c *AdGroupAdLabelClient) GetAdGroupAdLabel(ctx context.Context, req *servicespb.GetAdGroupAdLabelRequest, opts ...gax.CallOption) (*resourcespb.AdGroupAdLabel, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetAdGroupAdLabel[0:len(c.CallOptions.GetAdGroupAdLabel):len(c.CallOptions.GetAdGroupAdLabel)], opts...)
-	var resp *resourcespb.AdGroupAdLabel
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.adGroupAdLabelClient.GetAdGroupAdLabel(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.GetAdGroupAdLabel(ctx, req, opts...)
 }
 
 // MutateAdGroupAdLabels creates and removes ad group ad labels.
@@ -205,6 +155,111 @@ func (c *AdGroupAdLabelClient) GetAdGroupAdLabel(ctx context.Context, req *servi
 // QuotaError (at )
 // RequestError (at )
 func (c *AdGroupAdLabelClient) MutateAdGroupAdLabels(ctx context.Context, req *servicespb.MutateAdGroupAdLabelsRequest, opts ...gax.CallOption) (*servicespb.MutateAdGroupAdLabelsResponse, error) {
+	return c.internalClient.MutateAdGroupAdLabels(ctx, req, opts...)
+}
+
+// adGroupAdLabelGRPCClient is a client for interacting with Google Ads API over gRPC transport.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+type adGroupAdLabelGRPCClient struct {
+	// Connection pool of gRPC connections to the service.
+	connPool gtransport.ConnPool
+
+	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
+	disableDeadlines bool
+
+	// Points back to the CallOptions field of the containing AdGroupAdLabelClient
+	CallOptions **AdGroupAdLabelCallOptions
+
+	// The gRPC API client.
+	adGroupAdLabelClient servicespb.AdGroupAdLabelServiceClient
+
+	// The x-goog-* metadata to be sent with each request.
+	xGoogMetadata metadata.MD
+}
+
+// NewAdGroupAdLabelClient creates a new ad group ad label service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
+//
+// Service to manage labels on ad group ads.
+func NewAdGroupAdLabelClient(ctx context.Context, opts ...option.ClientOption) (*AdGroupAdLabelClient, error) {
+	clientOpts := defaultAdGroupAdLabelGRPCClientOptions()
+	if newAdGroupAdLabelClientHook != nil {
+		hookOpts, err := newAdGroupAdLabelClientHook(ctx, clientHookParams{})
+		if err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, hookOpts...)
+	}
+
+	disableDeadlines, err := checkDisableDeadlines()
+	if err != nil {
+		return nil, err
+	}
+
+	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
+	if err != nil {
+		return nil, err
+	}
+	client := AdGroupAdLabelClient{CallOptions: defaultAdGroupAdLabelCallOptions()}
+
+	c := &adGroupAdLabelGRPCClient{
+		connPool:             connPool,
+		disableDeadlines:     disableDeadlines,
+		adGroupAdLabelClient: servicespb.NewAdGroupAdLabelServiceClient(connPool),
+		CallOptions:          &client.CallOptions,
+	}
+	c.setGoogleClientInfo()
+
+	client.internalClient = c
+
+	return &client, nil
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *adGroupAdLabelGRPCClient) Connection() *grpc.ClientConn {
+	return c.connPool.Conn()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *adGroupAdLabelGRPCClient) setGoogleClientInfo(keyval ...string) {
+	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+}
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *adGroupAdLabelGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *adGroupAdLabelGRPCClient) GetAdGroupAdLabel(ctx context.Context, req *servicespb.GetAdGroupAdLabelRequest, opts ...gax.CallOption) (*resourcespb.AdGroupAdLabel, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).GetAdGroupAdLabel[0:len((*c.CallOptions).GetAdGroupAdLabel):len((*c.CallOptions).GetAdGroupAdLabel)], opts...)
+	var resp *resourcespb.AdGroupAdLabel
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.adGroupAdLabelClient.GetAdGroupAdLabel(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *adGroupAdLabelGRPCClient) MutateAdGroupAdLabels(ctx context.Context, req *servicespb.MutateAdGroupAdLabelsRequest, opts ...gax.CallOption) (*servicespb.MutateAdGroupAdLabelsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -212,7 +267,7 @@ func (c *AdGroupAdLabelClient) MutateAdGroupAdLabels(ctx context.Context, req *s
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateAdGroupAdLabels[0:len(c.CallOptions.MutateAdGroupAdLabels):len(c.CallOptions.MutateAdGroupAdLabels)], opts...)
+	opts = append((*c.CallOptions).MutateAdGroupAdLabels[0:len((*c.CallOptions).MutateAdGroupAdLabels):len((*c.CallOptions).MutateAdGroupAdLabels)], opts...)
 	var resp *servicespb.MutateAdGroupAdLabelsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

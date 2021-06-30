@@ -42,12 +42,13 @@ type SharedSetCallOptions struct {
 	MutateSharedSets []gax.CallOption
 }
 
-func defaultSharedSetClientOptions() []option.ClientOption {
+func defaultSharedSetGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -83,81 +84,47 @@ func defaultSharedSetCallOptions() *SharedSetCallOptions {
 	}
 }
 
+// internalSharedSetClient is an interface that defines the methods availaible from Google Ads API.
+type internalSharedSetClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetSharedSet(context.Context, *servicespb.GetSharedSetRequest, ...gax.CallOption) (*resourcespb.SharedSet, error)
+	MutateSharedSets(context.Context, *servicespb.MutateSharedSetsRequest, ...gax.CallOption) (*servicespb.MutateSharedSetsResponse, error)
+}
+
 // SharedSetClient is a client for interacting with Google Ads API.
-//
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage shared sets.
 type SharedSetClient struct {
-	// Connection pool of gRPC connections to the service.
-	connPool gtransport.ConnPool
-
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
-	// The gRPC API client.
-	sharedSetClient servicespb.SharedSetServiceClient
+	// The internal transport-dependent client.
+	internalClient internalSharedSetClient
 
 	// The call options for this service.
 	CallOptions *SharedSetCallOptions
-
-	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
 }
 
-// NewSharedSetClient creates a new shared set service client.
-//
-// Service to manage shared sets.
-func NewSharedSetClient(ctx context.Context, opts ...option.ClientOption) (*SharedSetClient, error) {
-	clientOpts := defaultSharedSetClientOptions()
-
-	if newSharedSetClientHook != nil {
-		hookOpts, err := newSharedSetClientHook(ctx, clientHookParams{})
-		if err != nil {
-			return nil, err
-		}
-		clientOpts = append(clientOpts, hookOpts...)
-	}
-
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
-	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
-	if err != nil {
-		return nil, err
-	}
-	c := &SharedSetClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultSharedSetCallOptions(),
-
-		sharedSetClient: servicespb.NewSharedSetServiceClient(connPool),
-	}
-	c.setGoogleClientInfo()
-
-	return c, nil
-}
-
-// Connection returns a connection to the API service.
-//
-// Deprecated.
-func (c *SharedSetClient) Connection() *grpc.ClientConn {
-	return c.connPool.Conn()
-}
+// Wrapper methods routed to the internal client.
 
 // Close closes the connection to the API service. The user should invoke this when
 // the client is no longer required.
 func (c *SharedSetClient) Close() error {
-	return c.connPool.Close()
+	return c.internalClient.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *SharedSetClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *SharedSetClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
 }
 
 // GetSharedSet returns the requested shared set in full detail.
@@ -170,24 +137,7 @@ func (c *SharedSetClient) setGoogleClientInfo(keyval ...string) {
 // QuotaError (at )
 // RequestError (at )
 func (c *SharedSetClient) GetSharedSet(ctx context.Context, req *servicespb.GetSharedSetRequest, opts ...gax.CallOption) (*resourcespb.SharedSet, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetSharedSet[0:len(c.CallOptions.GetSharedSet):len(c.CallOptions.GetSharedSet)], opts...)
-	var resp *resourcespb.SharedSet
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.sharedSetClient.GetSharedSet(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.GetSharedSet(ctx, req, opts...)
 }
 
 // MutateSharedSets creates, updates, or removes shared sets. Operation statuses are returned.
@@ -217,6 +167,111 @@ func (c *SharedSetClient) GetSharedSet(ctx context.Context, req *servicespb.GetS
 // StringFormatError (at )
 // StringLengthError (at )
 func (c *SharedSetClient) MutateSharedSets(ctx context.Context, req *servicespb.MutateSharedSetsRequest, opts ...gax.CallOption) (*servicespb.MutateSharedSetsResponse, error) {
+	return c.internalClient.MutateSharedSets(ctx, req, opts...)
+}
+
+// sharedSetGRPCClient is a client for interacting with Google Ads API over gRPC transport.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+type sharedSetGRPCClient struct {
+	// Connection pool of gRPC connections to the service.
+	connPool gtransport.ConnPool
+
+	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
+	disableDeadlines bool
+
+	// Points back to the CallOptions field of the containing SharedSetClient
+	CallOptions **SharedSetCallOptions
+
+	// The gRPC API client.
+	sharedSetClient servicespb.SharedSetServiceClient
+
+	// The x-goog-* metadata to be sent with each request.
+	xGoogMetadata metadata.MD
+}
+
+// NewSharedSetClient creates a new shared set service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
+//
+// Service to manage shared sets.
+func NewSharedSetClient(ctx context.Context, opts ...option.ClientOption) (*SharedSetClient, error) {
+	clientOpts := defaultSharedSetGRPCClientOptions()
+	if newSharedSetClientHook != nil {
+		hookOpts, err := newSharedSetClientHook(ctx, clientHookParams{})
+		if err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, hookOpts...)
+	}
+
+	disableDeadlines, err := checkDisableDeadlines()
+	if err != nil {
+		return nil, err
+	}
+
+	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
+	if err != nil {
+		return nil, err
+	}
+	client := SharedSetClient{CallOptions: defaultSharedSetCallOptions()}
+
+	c := &sharedSetGRPCClient{
+		connPool:         connPool,
+		disableDeadlines: disableDeadlines,
+		sharedSetClient:  servicespb.NewSharedSetServiceClient(connPool),
+		CallOptions:      &client.CallOptions,
+	}
+	c.setGoogleClientInfo()
+
+	client.internalClient = c
+
+	return &client, nil
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *sharedSetGRPCClient) Connection() *grpc.ClientConn {
+	return c.connPool.Conn()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *sharedSetGRPCClient) setGoogleClientInfo(keyval ...string) {
+	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+}
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *sharedSetGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *sharedSetGRPCClient) GetSharedSet(ctx context.Context, req *servicespb.GetSharedSetRequest, opts ...gax.CallOption) (*resourcespb.SharedSet, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).GetSharedSet[0:len((*c.CallOptions).GetSharedSet):len((*c.CallOptions).GetSharedSet)], opts...)
+	var resp *resourcespb.SharedSet
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.sharedSetClient.GetSharedSet(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *sharedSetGRPCClient) MutateSharedSets(ctx context.Context, req *servicespb.MutateSharedSetsRequest, opts ...gax.CallOption) (*servicespb.MutateSharedSetsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -224,7 +279,7 @@ func (c *SharedSetClient) MutateSharedSets(ctx context.Context, req *servicespb.
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateSharedSets[0:len(c.CallOptions.MutateSharedSets):len(c.CallOptions.MutateSharedSets)], opts...)
+	opts = append((*c.CallOptions).MutateSharedSets[0:len((*c.CallOptions).MutateSharedSets):len((*c.CallOptions).MutateSharedSets)], opts...)
 	var resp *servicespb.MutateSharedSetsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

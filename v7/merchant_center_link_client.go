@@ -43,12 +43,13 @@ type MerchantCenterLinkCallOptions struct {
 	MutateMerchantCenterLink []gax.CallOption
 }
 
-func defaultMerchantCenterLinkClientOptions() []option.ClientOption {
+func defaultMerchantCenterLinkGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -96,33 +97,118 @@ func defaultMerchantCenterLinkCallOptions() *MerchantCenterLinkCallOptions {
 	}
 }
 
+// internalMerchantCenterLinkClient is an interface that defines the methods availaible from Google Ads API.
+type internalMerchantCenterLinkClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	ListMerchantCenterLinks(context.Context, *servicespb.ListMerchantCenterLinksRequest, ...gax.CallOption) (*servicespb.ListMerchantCenterLinksResponse, error)
+	GetMerchantCenterLink(context.Context, *servicespb.GetMerchantCenterLinkRequest, ...gax.CallOption) (*resourcespb.MerchantCenterLink, error)
+	MutateMerchantCenterLink(context.Context, *servicespb.MutateMerchantCenterLinkRequest, ...gax.CallOption) (*servicespb.MutateMerchantCenterLinkResponse, error)
+}
+
 // MerchantCenterLinkClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// This service allows management of links between Google Ads and Google
+// Merchant Center.
+type MerchantCenterLinkClient struct {
+	// The internal transport-dependent client.
+	internalClient internalMerchantCenterLinkClient
+
+	// The call options for this service.
+	CallOptions *MerchantCenterLinkCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *MerchantCenterLinkClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *MerchantCenterLinkClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *MerchantCenterLinkClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// ListMerchantCenterLinks returns Merchant Center links available for this customer.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *MerchantCenterLinkClient) ListMerchantCenterLinks(ctx context.Context, req *servicespb.ListMerchantCenterLinksRequest, opts ...gax.CallOption) (*servicespb.ListMerchantCenterLinksResponse, error) {
+	return c.internalClient.ListMerchantCenterLinks(ctx, req, opts...)
+}
+
+// GetMerchantCenterLink returns the Merchant Center link in full detail.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *MerchantCenterLinkClient) GetMerchantCenterLink(ctx context.Context, req *servicespb.GetMerchantCenterLinkRequest, opts ...gax.CallOption) (*resourcespb.MerchantCenterLink, error) {
+	return c.internalClient.GetMerchantCenterLink(ctx, req, opts...)
+}
+
+// MutateMerchantCenterLink updates status or removes a Merchant Center link.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// FieldMaskError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *MerchantCenterLinkClient) MutateMerchantCenterLink(ctx context.Context, req *servicespb.MutateMerchantCenterLinkRequest, opts ...gax.CallOption) (*servicespb.MutateMerchantCenterLinkResponse, error) {
+	return c.internalClient.MutateMerchantCenterLink(ctx, req, opts...)
+}
+
+// merchantCenterLinkGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type MerchantCenterLinkClient struct {
+type merchantCenterLinkGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing MerchantCenterLinkClient
+	CallOptions **MerchantCenterLinkCallOptions
+
 	// The gRPC API client.
 	merchantCenterLinkClient servicespb.MerchantCenterLinkServiceClient
-
-	// The call options for this service.
-	CallOptions *MerchantCenterLinkCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewMerchantCenterLinkClient creates a new merchant center link service client.
+// NewMerchantCenterLinkClient creates a new merchant center link service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // This service allows management of links between Google Ads and Google
 // Merchant Center.
 func NewMerchantCenterLinkClient(ctx context.Context, opts ...option.ClientOption) (*MerchantCenterLinkClient, error) {
-	clientOpts := defaultMerchantCenterLinkClientOptions()
-
+	clientOpts := defaultMerchantCenterLinkGRPCClientOptions()
 	if newMerchantCenterLinkClientHook != nil {
 		hookOpts, err := newMerchantCenterLinkClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -140,50 +226,44 @@ func NewMerchantCenterLinkClient(ctx context.Context, opts ...option.ClientOptio
 	if err != nil {
 		return nil, err
 	}
-	c := &MerchantCenterLinkClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultMerchantCenterLinkCallOptions(),
+	client := MerchantCenterLinkClient{CallOptions: defaultMerchantCenterLinkCallOptions()}
 
+	c := &merchantCenterLinkGRPCClient{
+		connPool:                 connPool,
+		disableDeadlines:         disableDeadlines,
 		merchantCenterLinkClient: servicespb.NewMerchantCenterLinkServiceClient(connPool),
+		CallOptions:              &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *MerchantCenterLinkClient) Connection() *grpc.ClientConn {
+func (c *merchantCenterLinkGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *MerchantCenterLinkClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *MerchantCenterLinkClient) setGoogleClientInfo(keyval ...string) {
+func (c *merchantCenterLinkGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// ListMerchantCenterLinks returns Merchant Center links available for this customer.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *MerchantCenterLinkClient) ListMerchantCenterLinks(ctx context.Context, req *servicespb.ListMerchantCenterLinksRequest, opts ...gax.CallOption) (*servicespb.ListMerchantCenterLinksResponse, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *merchantCenterLinkGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *merchantCenterLinkGRPCClient) ListMerchantCenterLinks(ctx context.Context, req *servicespb.ListMerchantCenterLinksRequest, opts ...gax.CallOption) (*servicespb.ListMerchantCenterLinksResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -191,7 +271,7 @@ func (c *MerchantCenterLinkClient) ListMerchantCenterLinks(ctx context.Context, 
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.ListMerchantCenterLinks[0:len(c.CallOptions.ListMerchantCenterLinks):len(c.CallOptions.ListMerchantCenterLinks)], opts...)
+	opts = append((*c.CallOptions).ListMerchantCenterLinks[0:len((*c.CallOptions).ListMerchantCenterLinks):len((*c.CallOptions).ListMerchantCenterLinks)], opts...)
 	var resp *servicespb.ListMerchantCenterLinksResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
@@ -204,16 +284,7 @@ func (c *MerchantCenterLinkClient) ListMerchantCenterLinks(ctx context.Context, 
 	return resp, nil
 }
 
-// GetMerchantCenterLink returns the Merchant Center link in full detail.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *MerchantCenterLinkClient) GetMerchantCenterLink(ctx context.Context, req *servicespb.GetMerchantCenterLinkRequest, opts ...gax.CallOption) (*resourcespb.MerchantCenterLink, error) {
+func (c *merchantCenterLinkGRPCClient) GetMerchantCenterLink(ctx context.Context, req *servicespb.GetMerchantCenterLinkRequest, opts ...gax.CallOption) (*resourcespb.MerchantCenterLink, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -221,7 +292,7 @@ func (c *MerchantCenterLinkClient) GetMerchantCenterLink(ctx context.Context, re
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetMerchantCenterLink[0:len(c.CallOptions.GetMerchantCenterLink):len(c.CallOptions.GetMerchantCenterLink)], opts...)
+	opts = append((*c.CallOptions).GetMerchantCenterLink[0:len((*c.CallOptions).GetMerchantCenterLink):len((*c.CallOptions).GetMerchantCenterLink)], opts...)
 	var resp *resourcespb.MerchantCenterLink
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
@@ -234,17 +305,7 @@ func (c *MerchantCenterLinkClient) GetMerchantCenterLink(ctx context.Context, re
 	return resp, nil
 }
 
-// MutateMerchantCenterLink updates status or removes a Merchant Center link.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// FieldMaskError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *MerchantCenterLinkClient) MutateMerchantCenterLink(ctx context.Context, req *servicespb.MutateMerchantCenterLinkRequest, opts ...gax.CallOption) (*servicespb.MutateMerchantCenterLinkResponse, error) {
+func (c *merchantCenterLinkGRPCClient) MutateMerchantCenterLink(ctx context.Context, req *servicespb.MutateMerchantCenterLinkRequest, opts ...gax.CallOption) (*servicespb.MutateMerchantCenterLinkResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -252,7 +313,7 @@ func (c *MerchantCenterLinkClient) MutateMerchantCenterLink(ctx context.Context,
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateMerchantCenterLink[0:len(c.CallOptions.MutateMerchantCenterLink):len(c.CallOptions.MutateMerchantCenterLink)], opts...)
+	opts = append((*c.CallOptions).MutateMerchantCenterLink[0:len((*c.CallOptions).MutateMerchantCenterLink):len((*c.CallOptions).MutateMerchantCenterLink)], opts...)
 	var resp *servicespb.MutateMerchantCenterLinkResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

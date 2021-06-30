@@ -42,12 +42,13 @@ type AccountBudgetProposalCallOptions struct {
 	MutateAccountBudgetProposal []gax.CallOption
 }
 
-func defaultAccountBudgetProposalClientOptions() []option.ClientOption {
+func defaultAccountBudgetProposalGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -83,27 +84,17 @@ func defaultAccountBudgetProposalCallOptions() *AccountBudgetProposalCallOptions
 	}
 }
 
-// AccountBudgetProposalClient is a client for interacting with Google Ads API.
-//
-// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type AccountBudgetProposalClient struct {
-	// Connection pool of gRPC connections to the service.
-	connPool gtransport.ConnPool
-
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
-	// The gRPC API client.
-	accountBudgetProposalClient servicespb.AccountBudgetProposalServiceClient
-
-	// The call options for this service.
-	CallOptions *AccountBudgetProposalCallOptions
-
-	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
+// internalAccountBudgetProposalClient is an interface that defines the methods availaible from Google Ads API.
+type internalAccountBudgetProposalClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetAccountBudgetProposal(context.Context, *servicespb.GetAccountBudgetProposalRequest, ...gax.CallOption) (*resourcespb.AccountBudgetProposal, error)
+	MutateAccountBudgetProposal(context.Context, *servicespb.MutateAccountBudgetProposalRequest, ...gax.CallOption) (*servicespb.MutateAccountBudgetProposalResponse, error)
 }
 
-// NewAccountBudgetProposalClient creates a new account budget proposal service client.
+// AccountBudgetProposalClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
 //
 // A service for managing account-level budgets via proposals.
 //
@@ -119,58 +110,34 @@ type AccountBudgetProposalClient struct {
 // The CREATE operation creates a new proposal.
 // UPDATE operations aren’t supported.
 // The REMOVE operation cancels a pending proposal.
-func NewAccountBudgetProposalClient(ctx context.Context, opts ...option.ClientOption) (*AccountBudgetProposalClient, error) {
-	clientOpts := defaultAccountBudgetProposalClientOptions()
+type AccountBudgetProposalClient struct {
+	// The internal transport-dependent client.
+	internalClient internalAccountBudgetProposalClient
 
-	if newAccountBudgetProposalClientHook != nil {
-		hookOpts, err := newAccountBudgetProposalClientHook(ctx, clientHookParams{})
-		if err != nil {
-			return nil, err
-		}
-		clientOpts = append(clientOpts, hookOpts...)
-	}
-
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
-	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
-	if err != nil {
-		return nil, err
-	}
-	c := &AccountBudgetProposalClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultAccountBudgetProposalCallOptions(),
-
-		accountBudgetProposalClient: servicespb.NewAccountBudgetProposalServiceClient(connPool),
-	}
-	c.setGoogleClientInfo()
-
-	return c, nil
+	// The call options for this service.
+	CallOptions *AccountBudgetProposalCallOptions
 }
 
-// Connection returns a connection to the API service.
-//
-// Deprecated.
-func (c *AccountBudgetProposalClient) Connection() *grpc.ClientConn {
-	return c.connPool.Conn()
-}
+// Wrapper methods routed to the internal client.
 
 // Close closes the connection to the API service. The user should invoke this when
 // the client is no longer required.
 func (c *AccountBudgetProposalClient) Close() error {
-	return c.connPool.Close()
+	return c.internalClient.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *AccountBudgetProposalClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *AccountBudgetProposalClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
 }
 
 // GetAccountBudgetProposal returns an account-level budget proposal in full detail.
@@ -183,24 +150,7 @@ func (c *AccountBudgetProposalClient) setGoogleClientInfo(keyval ...string) {
 // QuotaError (at )
 // RequestError (at )
 func (c *AccountBudgetProposalClient) GetAccountBudgetProposal(ctx context.Context, req *servicespb.GetAccountBudgetProposalRequest, opts ...gax.CallOption) (*resourcespb.AccountBudgetProposal, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetAccountBudgetProposal[0:len(c.CallOptions.GetAccountBudgetProposal):len(c.CallOptions.GetAccountBudgetProposal)], opts...)
-	var resp *resourcespb.AccountBudgetProposal
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.accountBudgetProposalClient.GetAccountBudgetProposal(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.GetAccountBudgetProposal(ctx, req, opts...)
 }
 
 // MutateAccountBudgetProposal creates, updates, or removes account budget proposals.  Operation statuses
@@ -221,6 +171,124 @@ func (c *AccountBudgetProposalClient) GetAccountBudgetProposal(ctx context.Conte
 // RequestError (at )
 // StringLengthError (at )
 func (c *AccountBudgetProposalClient) MutateAccountBudgetProposal(ctx context.Context, req *servicespb.MutateAccountBudgetProposalRequest, opts ...gax.CallOption) (*servicespb.MutateAccountBudgetProposalResponse, error) {
+	return c.internalClient.MutateAccountBudgetProposal(ctx, req, opts...)
+}
+
+// accountBudgetProposalGRPCClient is a client for interacting with Google Ads API over gRPC transport.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+type accountBudgetProposalGRPCClient struct {
+	// Connection pool of gRPC connections to the service.
+	connPool gtransport.ConnPool
+
+	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
+	disableDeadlines bool
+
+	// Points back to the CallOptions field of the containing AccountBudgetProposalClient
+	CallOptions **AccountBudgetProposalCallOptions
+
+	// The gRPC API client.
+	accountBudgetProposalClient servicespb.AccountBudgetProposalServiceClient
+
+	// The x-goog-* metadata to be sent with each request.
+	xGoogMetadata metadata.MD
+}
+
+// NewAccountBudgetProposalClient creates a new account budget proposal service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
+//
+// A service for managing account-level budgets via proposals.
+//
+// A proposal is a request to create a new budget or make changes to an
+// existing one.
+//
+// Reads for account-level budgets managed by these proposals will be
+// supported in a future version. Until then, please use the
+// BudgetOrderService from the AdWords API. Learn more at
+// https://developers.google.com/adwords/api/docs/guides/budget-order (at https://developers.google.com/adwords/api/docs/guides/budget-order)
+//
+// Mutates:
+// The CREATE operation creates a new proposal.
+// UPDATE operations aren’t supported.
+// The REMOVE operation cancels a pending proposal.
+func NewAccountBudgetProposalClient(ctx context.Context, opts ...option.ClientOption) (*AccountBudgetProposalClient, error) {
+	clientOpts := defaultAccountBudgetProposalGRPCClientOptions()
+	if newAccountBudgetProposalClientHook != nil {
+		hookOpts, err := newAccountBudgetProposalClientHook(ctx, clientHookParams{})
+		if err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, hookOpts...)
+	}
+
+	disableDeadlines, err := checkDisableDeadlines()
+	if err != nil {
+		return nil, err
+	}
+
+	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
+	if err != nil {
+		return nil, err
+	}
+	client := AccountBudgetProposalClient{CallOptions: defaultAccountBudgetProposalCallOptions()}
+
+	c := &accountBudgetProposalGRPCClient{
+		connPool:                    connPool,
+		disableDeadlines:            disableDeadlines,
+		accountBudgetProposalClient: servicespb.NewAccountBudgetProposalServiceClient(connPool),
+		CallOptions:                 &client.CallOptions,
+	}
+	c.setGoogleClientInfo()
+
+	client.internalClient = c
+
+	return &client, nil
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *accountBudgetProposalGRPCClient) Connection() *grpc.ClientConn {
+	return c.connPool.Conn()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *accountBudgetProposalGRPCClient) setGoogleClientInfo(keyval ...string) {
+	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+}
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *accountBudgetProposalGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *accountBudgetProposalGRPCClient) GetAccountBudgetProposal(ctx context.Context, req *servicespb.GetAccountBudgetProposalRequest, opts ...gax.CallOption) (*resourcespb.AccountBudgetProposal, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).GetAccountBudgetProposal[0:len((*c.CallOptions).GetAccountBudgetProposal):len((*c.CallOptions).GetAccountBudgetProposal)], opts...)
+	var resp *resourcespb.AccountBudgetProposal
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.accountBudgetProposalClient.GetAccountBudgetProposal(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *accountBudgetProposalGRPCClient) MutateAccountBudgetProposal(ctx context.Context, req *servicespb.MutateAccountBudgetProposalRequest, opts ...gax.CallOption) (*servicespb.MutateAccountBudgetProposalResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -228,7 +296,7 @@ func (c *AccountBudgetProposalClient) MutateAccountBudgetProposal(ctx context.Co
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateAccountBudgetProposal[0:len(c.CallOptions.MutateAccountBudgetProposal):len(c.CallOptions.MutateAccountBudgetProposal)], opts...)
+	opts = append((*c.CallOptions).MutateAccountBudgetProposal[0:len((*c.CallOptions).MutateAccountBudgetProposal):len((*c.CallOptions).MutateAccountBudgetProposal)], opts...)
 	var resp *servicespb.MutateAccountBudgetProposalResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

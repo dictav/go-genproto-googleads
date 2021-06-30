@@ -42,12 +42,13 @@ type CustomerUserAccessInvitationCallOptions struct {
 	MutateCustomerUserAccessInvitation []gax.CallOption
 }
 
-func defaultCustomerUserAccessInvitationClientOptions() []option.ClientOption {
+func defaultCustomerUserAccessInvitationGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -83,33 +84,104 @@ func defaultCustomerUserAccessInvitationCallOptions() *CustomerUserAccessInvitat
 	}
 }
 
+// internalCustomerUserAccessInvitationClient is an interface that defines the methods availaible from Google Ads API.
+type internalCustomerUserAccessInvitationClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetCustomerUserAccessInvitation(context.Context, *servicespb.GetCustomerUserAccessInvitationRequest, ...gax.CallOption) (*resourcespb.CustomerUserAccessInvitation, error)
+	MutateCustomerUserAccessInvitation(context.Context, *servicespb.MutateCustomerUserAccessInvitationRequest, ...gax.CallOption) (*servicespb.MutateCustomerUserAccessInvitationResponse, error)
+}
+
 // CustomerUserAccessInvitationClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// This service manages the access invitation extended to users for a given
+// customer.
+type CustomerUserAccessInvitationClient struct {
+	// The internal transport-dependent client.
+	internalClient internalCustomerUserAccessInvitationClient
+
+	// The call options for this service.
+	CallOptions *CustomerUserAccessInvitationCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *CustomerUserAccessInvitationClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *CustomerUserAccessInvitationClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *CustomerUserAccessInvitationClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// GetCustomerUserAccessInvitation returns the requested access invitation in full detail.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *CustomerUserAccessInvitationClient) GetCustomerUserAccessInvitation(ctx context.Context, req *servicespb.GetCustomerUserAccessInvitationRequest, opts ...gax.CallOption) (*resourcespb.CustomerUserAccessInvitation, error) {
+	return c.internalClient.GetCustomerUserAccessInvitation(ctx, req, opts...)
+}
+
+// MutateCustomerUserAccessInvitation creates or removes an access invitation.
+//
+// List of thrown errors:
+// AccessInvitationError (at )
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *CustomerUserAccessInvitationClient) MutateCustomerUserAccessInvitation(ctx context.Context, req *servicespb.MutateCustomerUserAccessInvitationRequest, opts ...gax.CallOption) (*servicespb.MutateCustomerUserAccessInvitationResponse, error) {
+	return c.internalClient.MutateCustomerUserAccessInvitation(ctx, req, opts...)
+}
+
+// customerUserAccessInvitationGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type CustomerUserAccessInvitationClient struct {
+type customerUserAccessInvitationGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing CustomerUserAccessInvitationClient
+	CallOptions **CustomerUserAccessInvitationCallOptions
+
 	// The gRPC API client.
 	customerUserAccessInvitationClient servicespb.CustomerUserAccessInvitationServiceClient
-
-	// The call options for this service.
-	CallOptions *CustomerUserAccessInvitationCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewCustomerUserAccessInvitationClient creates a new customer user access invitation service client.
+// NewCustomerUserAccessInvitationClient creates a new customer user access invitation service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // This service manages the access invitation extended to users for a given
 // customer.
 func NewCustomerUserAccessInvitationClient(ctx context.Context, opts ...option.ClientOption) (*CustomerUserAccessInvitationClient, error) {
-	clientOpts := defaultCustomerUserAccessInvitationClientOptions()
-
+	clientOpts := defaultCustomerUserAccessInvitationGRPCClientOptions()
 	if newCustomerUserAccessInvitationClientHook != nil {
 		hookOpts, err := newCustomerUserAccessInvitationClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -127,50 +199,44 @@ func NewCustomerUserAccessInvitationClient(ctx context.Context, opts ...option.C
 	if err != nil {
 		return nil, err
 	}
-	c := &CustomerUserAccessInvitationClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultCustomerUserAccessInvitationCallOptions(),
+	client := CustomerUserAccessInvitationClient{CallOptions: defaultCustomerUserAccessInvitationCallOptions()}
 
+	c := &customerUserAccessInvitationGRPCClient{
+		connPool:                           connPool,
+		disableDeadlines:                   disableDeadlines,
 		customerUserAccessInvitationClient: servicespb.NewCustomerUserAccessInvitationServiceClient(connPool),
+		CallOptions:                        &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *CustomerUserAccessInvitationClient) Connection() *grpc.ClientConn {
+func (c *customerUserAccessInvitationGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *CustomerUserAccessInvitationClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *CustomerUserAccessInvitationClient) setGoogleClientInfo(keyval ...string) {
+func (c *customerUserAccessInvitationGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// GetCustomerUserAccessInvitation returns the requested access invitation in full detail.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *CustomerUserAccessInvitationClient) GetCustomerUserAccessInvitation(ctx context.Context, req *servicespb.GetCustomerUserAccessInvitationRequest, opts ...gax.CallOption) (*resourcespb.CustomerUserAccessInvitation, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *customerUserAccessInvitationGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *customerUserAccessInvitationGRPCClient) GetCustomerUserAccessInvitation(ctx context.Context, req *servicespb.GetCustomerUserAccessInvitationRequest, opts ...gax.CallOption) (*resourcespb.CustomerUserAccessInvitation, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -178,7 +244,7 @@ func (c *CustomerUserAccessInvitationClient) GetCustomerUserAccessInvitation(ctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetCustomerUserAccessInvitation[0:len(c.CallOptions.GetCustomerUserAccessInvitation):len(c.CallOptions.GetCustomerUserAccessInvitation)], opts...)
+	opts = append((*c.CallOptions).GetCustomerUserAccessInvitation[0:len((*c.CallOptions).GetCustomerUserAccessInvitation):len((*c.CallOptions).GetCustomerUserAccessInvitation)], opts...)
 	var resp *resourcespb.CustomerUserAccessInvitation
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
@@ -191,17 +257,7 @@ func (c *CustomerUserAccessInvitationClient) GetCustomerUserAccessInvitation(ctx
 	return resp, nil
 }
 
-// MutateCustomerUserAccessInvitation creates or removes an access invitation.
-//
-// List of thrown errors:
-// AccessInvitationError (at )
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *CustomerUserAccessInvitationClient) MutateCustomerUserAccessInvitation(ctx context.Context, req *servicespb.MutateCustomerUserAccessInvitationRequest, opts ...gax.CallOption) (*servicespb.MutateCustomerUserAccessInvitationResponse, error) {
+func (c *customerUserAccessInvitationGRPCClient) MutateCustomerUserAccessInvitation(ctx context.Context, req *servicespb.MutateCustomerUserAccessInvitationRequest, opts ...gax.CallOption) (*servicespb.MutateCustomerUserAccessInvitationResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -209,7 +265,7 @@ func (c *CustomerUserAccessInvitationClient) MutateCustomerUserAccessInvitation(
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateCustomerUserAccessInvitation[0:len(c.CallOptions.MutateCustomerUserAccessInvitation):len(c.CallOptions.MutateCustomerUserAccessInvitation)], opts...)
+	opts = append((*c.CallOptions).MutateCustomerUserAccessInvitation[0:len((*c.CallOptions).MutateCustomerUserAccessInvitation):len((*c.CallOptions).MutateCustomerUserAccessInvitation)], opts...)
 	var resp *servicespb.MutateCustomerUserAccessInvitationResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

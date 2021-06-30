@@ -41,12 +41,13 @@ type DomainCategoryCallOptions struct {
 	GetDomainCategory []gax.CallOption
 }
 
-func defaultDomainCategoryClientOptions() []option.ClientOption {
+func defaultDomainCategoryGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -70,32 +71,87 @@ func defaultDomainCategoryCallOptions() *DomainCategoryCallOptions {
 	}
 }
 
+// internalDomainCategoryClient is an interface that defines the methods availaible from Google Ads API.
+type internalDomainCategoryClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetDomainCategory(context.Context, *servicespb.GetDomainCategoryRequest, ...gax.CallOption) (*resourcespb.DomainCategory, error)
+}
+
 // DomainCategoryClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to fetch domain categories.
+type DomainCategoryClient struct {
+	// The internal transport-dependent client.
+	internalClient internalDomainCategoryClient
+
+	// The call options for this service.
+	CallOptions *DomainCategoryCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *DomainCategoryClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *DomainCategoryClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *DomainCategoryClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// GetDomainCategory returns the requested domain category.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *DomainCategoryClient) GetDomainCategory(ctx context.Context, req *servicespb.GetDomainCategoryRequest, opts ...gax.CallOption) (*resourcespb.DomainCategory, error) {
+	return c.internalClient.GetDomainCategory(ctx, req, opts...)
+}
+
+// domainCategoryGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type DomainCategoryClient struct {
+type domainCategoryGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing DomainCategoryClient
+	CallOptions **DomainCategoryCallOptions
+
 	// The gRPC API client.
 	domainCategoryClient servicespb.DomainCategoryServiceClient
-
-	// The call options for this service.
-	CallOptions *DomainCategoryCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewDomainCategoryClient creates a new domain category service client.
+// NewDomainCategoryClient creates a new domain category service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // Service to fetch domain categories.
 func NewDomainCategoryClient(ctx context.Context, opts ...option.ClientOption) (*DomainCategoryClient, error) {
-	clientOpts := defaultDomainCategoryClientOptions()
-
+	clientOpts := defaultDomainCategoryGRPCClientOptions()
 	if newDomainCategoryClientHook != nil {
 		hookOpts, err := newDomainCategoryClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -113,50 +169,44 @@ func NewDomainCategoryClient(ctx context.Context, opts ...option.ClientOption) (
 	if err != nil {
 		return nil, err
 	}
-	c := &DomainCategoryClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultDomainCategoryCallOptions(),
+	client := DomainCategoryClient{CallOptions: defaultDomainCategoryCallOptions()}
 
+	c := &domainCategoryGRPCClient{
+		connPool:             connPool,
+		disableDeadlines:     disableDeadlines,
 		domainCategoryClient: servicespb.NewDomainCategoryServiceClient(connPool),
+		CallOptions:          &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *DomainCategoryClient) Connection() *grpc.ClientConn {
+func (c *domainCategoryGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *DomainCategoryClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *DomainCategoryClient) setGoogleClientInfo(keyval ...string) {
+func (c *domainCategoryGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// GetDomainCategory returns the requested domain category.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *DomainCategoryClient) GetDomainCategory(ctx context.Context, req *servicespb.GetDomainCategoryRequest, opts ...gax.CallOption) (*resourcespb.DomainCategory, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *domainCategoryGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *domainCategoryGRPCClient) GetDomainCategory(ctx context.Context, req *servicespb.GetDomainCategoryRequest, opts ...gax.CallOption) (*resourcespb.DomainCategory, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -164,7 +214,7 @@ func (c *DomainCategoryClient) GetDomainCategory(ctx context.Context, req *servi
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetDomainCategory[0:len(c.CallOptions.GetDomainCategory):len(c.CallOptions.GetDomainCategory)], opts...)
+	opts = append((*c.CallOptions).GetDomainCategory[0:len((*c.CallOptions).GetDomainCategory):len((*c.CallOptions).GetDomainCategory)], opts...)
 	var resp *resourcespb.DomainCategory
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

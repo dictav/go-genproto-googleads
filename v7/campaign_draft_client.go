@@ -25,7 +25,6 @@ import (
 
 	"cloud.google.com/go/longrunning"
 	lroauto "cloud.google.com/go/longrunning/autogen"
-	"github.com/golang/protobuf/proto"
 	gax "github.com/googleapis/gax-go/v2"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -38,6 +37,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/proto"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -51,12 +51,13 @@ type CampaignDraftCallOptions struct {
 	ListCampaignDraftAsyncErrors []gax.CallOption
 }
 
-func defaultCampaignDraftClientOptions() []option.ClientOption {
+func defaultCampaignDraftGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -116,96 +117,55 @@ func defaultCampaignDraftCallOptions() *CampaignDraftCallOptions {
 	}
 }
 
+// internalCampaignDraftClient is an interface that defines the methods availaible from Google Ads API.
+type internalCampaignDraftClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetCampaignDraft(context.Context, *servicespb.GetCampaignDraftRequest, ...gax.CallOption) (*resourcespb.CampaignDraft, error)
+	MutateCampaignDrafts(context.Context, *servicespb.MutateCampaignDraftsRequest, ...gax.CallOption) (*servicespb.MutateCampaignDraftsResponse, error)
+	PromoteCampaignDraft(context.Context, *servicespb.PromoteCampaignDraftRequest, ...gax.CallOption) (*PromoteCampaignDraftOperation, error)
+	PromoteCampaignDraftOperation(name string) *PromoteCampaignDraftOperation
+	ListCampaignDraftAsyncErrors(context.Context, *servicespb.ListCampaignDraftAsyncErrorsRequest, ...gax.CallOption) *StatusIterator
+}
+
 // CampaignDraftClient is a client for interacting with Google Ads API.
-//
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage campaign drafts.
 type CampaignDraftClient struct {
-	// Connection pool of gRPC connections to the service.
-	connPool gtransport.ConnPool
-
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
-	// The gRPC API client.
-	campaignDraftClient servicespb.CampaignDraftServiceClient
-
-	// LROClient is used internally to handle longrunning operations.
-	// It is exposed so that its CallOptions can be modified if required.
-	// Users should not Close this client.
-	LROClient *lroauto.OperationsClient
+	// The internal transport-dependent client.
+	internalClient internalCampaignDraftClient
 
 	// The call options for this service.
 	CallOptions *CampaignDraftCallOptions
 
-	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
+	// LROClient is used internally to handle long-running operations.
+	// It is exposed so that its CallOptions can be modified if required.
+	// Users should not Close this client.
+	LROClient *lroauto.OperationsClient
 }
 
-// NewCampaignDraftClient creates a new campaign draft service client.
-//
-// Service to manage campaign drafts.
-func NewCampaignDraftClient(ctx context.Context, opts ...option.ClientOption) (*CampaignDraftClient, error) {
-	clientOpts := defaultCampaignDraftClientOptions()
-
-	if newCampaignDraftClientHook != nil {
-		hookOpts, err := newCampaignDraftClientHook(ctx, clientHookParams{})
-		if err != nil {
-			return nil, err
-		}
-		clientOpts = append(clientOpts, hookOpts...)
-	}
-
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
-	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
-	if err != nil {
-		return nil, err
-	}
-	c := &CampaignDraftClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultCampaignDraftCallOptions(),
-
-		campaignDraftClient: servicespb.NewCampaignDraftServiceClient(connPool),
-	}
-	c.setGoogleClientInfo()
-
-	c.LROClient, err = lroauto.NewOperationsClient(ctx, gtransport.WithConnPool(connPool))
-	if err != nil {
-		// This error "should not happen", since we are just reusing old connection pool
-		// and never actually need to dial.
-		// If this does happen, we could leak connp. However, we cannot close conn:
-		// If the user invoked the constructor with option.WithGRPCConn,
-		// we would close a connection that's still in use.
-		// TODO: investigate error conditions.
-		return nil, err
-	}
-	return c, nil
-}
-
-// Connection returns a connection to the API service.
-//
-// Deprecated.
-func (c *CampaignDraftClient) Connection() *grpc.ClientConn {
-	return c.connPool.Conn()
-}
+// Wrapper methods routed to the internal client.
 
 // Close closes the connection to the API service. The user should invoke this when
 // the client is no longer required.
 func (c *CampaignDraftClient) Close() error {
-	return c.connPool.Close()
+	return c.internalClient.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *CampaignDraftClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *CampaignDraftClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
 }
 
 // GetCampaignDraft returns the requested campaign draft in full detail.
@@ -218,24 +178,7 @@ func (c *CampaignDraftClient) setGoogleClientInfo(keyval ...string) {
 // QuotaError (at )
 // RequestError (at )
 func (c *CampaignDraftClient) GetCampaignDraft(ctx context.Context, req *servicespb.GetCampaignDraftRequest, opts ...gax.CallOption) (*resourcespb.CampaignDraft, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetCampaignDraft[0:len(c.CallOptions.GetCampaignDraft):len(c.CallOptions.GetCampaignDraft)], opts...)
-	var resp *resourcespb.CampaignDraft
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.campaignDraftClient.GetCampaignDraft(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.GetCampaignDraft(ctx, req, opts...)
 }
 
 // MutateCampaignDrafts creates, updates, or removes campaign drafts. Operation statuses are
@@ -253,24 +196,7 @@ func (c *CampaignDraftClient) GetCampaignDraft(ctx context.Context, req *service
 // QuotaError (at )
 // RequestError (at )
 func (c *CampaignDraftClient) MutateCampaignDrafts(ctx context.Context, req *servicespb.MutateCampaignDraftsRequest, opts ...gax.CallOption) (*servicespb.MutateCampaignDraftsResponse, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateCampaignDrafts[0:len(c.CallOptions.MutateCampaignDrafts):len(c.CallOptions.MutateCampaignDrafts)], opts...)
-	var resp *servicespb.MutateCampaignDraftsResponse
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.campaignDraftClient.MutateCampaignDrafts(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.MutateCampaignDrafts(ctx, req, opts...)
 }
 
 // PromoteCampaignDraft promotes the changes in a draft back to the base campaign.
@@ -292,26 +218,13 @@ func (c *CampaignDraftClient) MutateCampaignDrafts(ctx context.Context, req *ser
 // QuotaError (at )
 // RequestError (at )
 func (c *CampaignDraftClient) PromoteCampaignDraft(ctx context.Context, req *servicespb.PromoteCampaignDraftRequest, opts ...gax.CallOption) (*PromoteCampaignDraftOperation, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "campaign_draft", url.QueryEscape(req.GetCampaignDraft())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.PromoteCampaignDraft[0:len(c.CallOptions.PromoteCampaignDraft):len(c.CallOptions.PromoteCampaignDraft)], opts...)
-	var resp *longrunningpb.Operation
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.campaignDraftClient.PromoteCampaignDraft(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return &PromoteCampaignDraftOperation{
-		lro: longrunning.InternalNewOperation(c.LROClient, resp),
-	}, nil
+	return c.internalClient.PromoteCampaignDraft(ctx, req, opts...)
+}
+
+// PromoteCampaignDraftOperation returns a new PromoteCampaignDraftOperation from a given name.
+// The name must be that of a previously created PromoteCampaignDraftOperation, possibly from a different process.
+func (c *CampaignDraftClient) PromoteCampaignDraftOperation(name string) *PromoteCampaignDraftOperation {
+	return c.internalClient.PromoteCampaignDraftOperation(name)
 }
 
 // ListCampaignDraftAsyncErrors returns all errors that occurred during CampaignDraft promote. Throws an
@@ -326,9 +239,174 @@ func (c *CampaignDraftClient) PromoteCampaignDraft(ctx context.Context, req *ser
 // QuotaError (at )
 // RequestError (at )
 func (c *CampaignDraftClient) ListCampaignDraftAsyncErrors(ctx context.Context, req *servicespb.ListCampaignDraftAsyncErrorsRequest, opts ...gax.CallOption) *StatusIterator {
+	return c.internalClient.ListCampaignDraftAsyncErrors(ctx, req, opts...)
+}
+
+// campaignDraftGRPCClient is a client for interacting with Google Ads API over gRPC transport.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+type campaignDraftGRPCClient struct {
+	// Connection pool of gRPC connections to the service.
+	connPool gtransport.ConnPool
+
+	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
+	disableDeadlines bool
+
+	// Points back to the CallOptions field of the containing CampaignDraftClient
+	CallOptions **CampaignDraftCallOptions
+
+	// The gRPC API client.
+	campaignDraftClient servicespb.CampaignDraftServiceClient
+
+	// LROClient is used internally to handle long-running operations.
+	// It is exposed so that its CallOptions can be modified if required.
+	// Users should not Close this client.
+	LROClient **lroauto.OperationsClient
+
+	// The x-goog-* metadata to be sent with each request.
+	xGoogMetadata metadata.MD
+}
+
+// NewCampaignDraftClient creates a new campaign draft service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
+//
+// Service to manage campaign drafts.
+func NewCampaignDraftClient(ctx context.Context, opts ...option.ClientOption) (*CampaignDraftClient, error) {
+	clientOpts := defaultCampaignDraftGRPCClientOptions()
+	if newCampaignDraftClientHook != nil {
+		hookOpts, err := newCampaignDraftClientHook(ctx, clientHookParams{})
+		if err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, hookOpts...)
+	}
+
+	disableDeadlines, err := checkDisableDeadlines()
+	if err != nil {
+		return nil, err
+	}
+
+	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
+	if err != nil {
+		return nil, err
+	}
+	client := CampaignDraftClient{CallOptions: defaultCampaignDraftCallOptions()}
+
+	c := &campaignDraftGRPCClient{
+		connPool:            connPool,
+		disableDeadlines:    disableDeadlines,
+		campaignDraftClient: servicespb.NewCampaignDraftServiceClient(connPool),
+		CallOptions:         &client.CallOptions,
+	}
+	c.setGoogleClientInfo()
+
+	client.internalClient = c
+
+	client.LROClient, err = lroauto.NewOperationsClient(ctx, gtransport.WithConnPool(connPool))
+	if err != nil {
+		// This error "should not happen", since we are just reusing old connection pool
+		// and never actually need to dial.
+		// If this does happen, we could leak connp. However, we cannot close conn:
+		// If the user invoked the constructor with option.WithGRPCConn,
+		// we would close a connection that's still in use.
+		// TODO: investigate error conditions.
+		return nil, err
+	}
+	c.LROClient = &client.LROClient
+	return &client, nil
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *campaignDraftGRPCClient) Connection() *grpc.ClientConn {
+	return c.connPool.Conn()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *campaignDraftGRPCClient) setGoogleClientInfo(keyval ...string) {
+	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+}
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *campaignDraftGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *campaignDraftGRPCClient) GetCampaignDraft(ctx context.Context, req *servicespb.GetCampaignDraftRequest, opts ...gax.CallOption) (*resourcespb.CampaignDraft, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.ListCampaignDraftAsyncErrors[0:len(c.CallOptions.ListCampaignDraftAsyncErrors):len(c.CallOptions.ListCampaignDraftAsyncErrors)], opts...)
+	opts = append((*c.CallOptions).GetCampaignDraft[0:len((*c.CallOptions).GetCampaignDraft):len((*c.CallOptions).GetCampaignDraft)], opts...)
+	var resp *resourcespb.CampaignDraft
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.campaignDraftClient.GetCampaignDraft(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *campaignDraftGRPCClient) MutateCampaignDrafts(ctx context.Context, req *servicespb.MutateCampaignDraftsRequest, opts ...gax.CallOption) (*servicespb.MutateCampaignDraftsResponse, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).MutateCampaignDrafts[0:len((*c.CallOptions).MutateCampaignDrafts):len((*c.CallOptions).MutateCampaignDrafts)], opts...)
+	var resp *servicespb.MutateCampaignDraftsResponse
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.campaignDraftClient.MutateCampaignDrafts(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *campaignDraftGRPCClient) PromoteCampaignDraft(ctx context.Context, req *servicespb.PromoteCampaignDraftRequest, opts ...gax.CallOption) (*PromoteCampaignDraftOperation, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "campaign_draft", url.QueryEscape(req.GetCampaignDraft())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).PromoteCampaignDraft[0:len((*c.CallOptions).PromoteCampaignDraft):len((*c.CallOptions).PromoteCampaignDraft)], opts...)
+	var resp *longrunningpb.Operation
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.campaignDraftClient.PromoteCampaignDraft(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &PromoteCampaignDraftOperation{
+		lro: longrunning.InternalNewOperation(*c.LROClient, resp),
+	}, nil
+}
+
+func (c *campaignDraftGRPCClient) ListCampaignDraftAsyncErrors(ctx context.Context, req *servicespb.ListCampaignDraftAsyncErrorsRequest, opts ...gax.CallOption) *StatusIterator {
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).ListCampaignDraftAsyncErrors[0:len((*c.CallOptions).ListCampaignDraftAsyncErrors):len((*c.CallOptions).ListCampaignDraftAsyncErrors)], opts...)
 	it := &StatusIterator{}
 	req = proto.Clone(req).(*servicespb.ListCampaignDraftAsyncErrorsRequest)
 	it.InternalFetch = func(pageSize int, pageToken string) ([]*statuspb.Status, string, error) {
@@ -372,9 +450,9 @@ type PromoteCampaignDraftOperation struct {
 
 // PromoteCampaignDraftOperation returns a new PromoteCampaignDraftOperation from a given name.
 // The name must be that of a previously created PromoteCampaignDraftOperation, possibly from a different process.
-func (c *CampaignDraftClient) PromoteCampaignDraftOperation(name string) *PromoteCampaignDraftOperation {
+func (c *campaignDraftGRPCClient) PromoteCampaignDraftOperation(name string) *PromoteCampaignDraftOperation {
 	return &PromoteCampaignDraftOperation{
-		lro: longrunning.InternalNewOperation(c.LROClient, &longrunningpb.Operation{Name: name}),
+		lro: longrunning.InternalNewOperation(*c.LROClient, &longrunningpb.Operation{Name: name}),
 	}
 }
 

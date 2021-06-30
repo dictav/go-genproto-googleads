@@ -42,12 +42,13 @@ type FeedItemTargetCallOptions struct {
 	MutateFeedItemTargets []gax.CallOption
 }
 
-func defaultFeedItemTargetClientOptions() []option.ClientOption {
+func defaultFeedItemTargetGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -83,81 +84,47 @@ func defaultFeedItemTargetCallOptions() *FeedItemTargetCallOptions {
 	}
 }
 
+// internalFeedItemTargetClient is an interface that defines the methods availaible from Google Ads API.
+type internalFeedItemTargetClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetFeedItemTarget(context.Context, *servicespb.GetFeedItemTargetRequest, ...gax.CallOption) (*resourcespb.FeedItemTarget, error)
+	MutateFeedItemTargets(context.Context, *servicespb.MutateFeedItemTargetsRequest, ...gax.CallOption) (*servicespb.MutateFeedItemTargetsResponse, error)
+}
+
 // FeedItemTargetClient is a client for interacting with Google Ads API.
-//
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage feed item targets.
 type FeedItemTargetClient struct {
-	// Connection pool of gRPC connections to the service.
-	connPool gtransport.ConnPool
-
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
-	// The gRPC API client.
-	feedItemTargetClient servicespb.FeedItemTargetServiceClient
+	// The internal transport-dependent client.
+	internalClient internalFeedItemTargetClient
 
 	// The call options for this service.
 	CallOptions *FeedItemTargetCallOptions
-
-	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
 }
 
-// NewFeedItemTargetClient creates a new feed item target service client.
-//
-// Service to manage feed item targets.
-func NewFeedItemTargetClient(ctx context.Context, opts ...option.ClientOption) (*FeedItemTargetClient, error) {
-	clientOpts := defaultFeedItemTargetClientOptions()
-
-	if newFeedItemTargetClientHook != nil {
-		hookOpts, err := newFeedItemTargetClientHook(ctx, clientHookParams{})
-		if err != nil {
-			return nil, err
-		}
-		clientOpts = append(clientOpts, hookOpts...)
-	}
-
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
-	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
-	if err != nil {
-		return nil, err
-	}
-	c := &FeedItemTargetClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultFeedItemTargetCallOptions(),
-
-		feedItemTargetClient: servicespb.NewFeedItemTargetServiceClient(connPool),
-	}
-	c.setGoogleClientInfo()
-
-	return c, nil
-}
-
-// Connection returns a connection to the API service.
-//
-// Deprecated.
-func (c *FeedItemTargetClient) Connection() *grpc.ClientConn {
-	return c.connPool.Conn()
-}
+// Wrapper methods routed to the internal client.
 
 // Close closes the connection to the API service. The user should invoke this when
 // the client is no longer required.
 func (c *FeedItemTargetClient) Close() error {
-	return c.connPool.Close()
+	return c.internalClient.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *FeedItemTargetClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *FeedItemTargetClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
 }
 
 // GetFeedItemTarget returns the requested feed item targets in full detail.
@@ -170,24 +137,7 @@ func (c *FeedItemTargetClient) setGoogleClientInfo(keyval ...string) {
 // QuotaError (at )
 // RequestError (at )
 func (c *FeedItemTargetClient) GetFeedItemTarget(ctx context.Context, req *servicespb.GetFeedItemTargetRequest, opts ...gax.CallOption) (*resourcespb.FeedItemTarget, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetFeedItemTarget[0:len(c.CallOptions.GetFeedItemTarget):len(c.CallOptions.GetFeedItemTarget)], opts...)
-	var resp *resourcespb.FeedItemTarget
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.feedItemTargetClient.GetFeedItemTarget(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.GetFeedItemTarget(ctx, req, opts...)
 }
 
 // MutateFeedItemTargets creates or removes feed item targets. Operation statuses are returned.
@@ -213,6 +163,111 @@ func (c *FeedItemTargetClient) GetFeedItemTarget(ctx context.Context, req *servi
 // StringFormatError (at )
 // StringLengthError (at )
 func (c *FeedItemTargetClient) MutateFeedItemTargets(ctx context.Context, req *servicespb.MutateFeedItemTargetsRequest, opts ...gax.CallOption) (*servicespb.MutateFeedItemTargetsResponse, error) {
+	return c.internalClient.MutateFeedItemTargets(ctx, req, opts...)
+}
+
+// feedItemTargetGRPCClient is a client for interacting with Google Ads API over gRPC transport.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+type feedItemTargetGRPCClient struct {
+	// Connection pool of gRPC connections to the service.
+	connPool gtransport.ConnPool
+
+	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
+	disableDeadlines bool
+
+	// Points back to the CallOptions field of the containing FeedItemTargetClient
+	CallOptions **FeedItemTargetCallOptions
+
+	// The gRPC API client.
+	feedItemTargetClient servicespb.FeedItemTargetServiceClient
+
+	// The x-goog-* metadata to be sent with each request.
+	xGoogMetadata metadata.MD
+}
+
+// NewFeedItemTargetClient creates a new feed item target service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
+//
+// Service to manage feed item targets.
+func NewFeedItemTargetClient(ctx context.Context, opts ...option.ClientOption) (*FeedItemTargetClient, error) {
+	clientOpts := defaultFeedItemTargetGRPCClientOptions()
+	if newFeedItemTargetClientHook != nil {
+		hookOpts, err := newFeedItemTargetClientHook(ctx, clientHookParams{})
+		if err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, hookOpts...)
+	}
+
+	disableDeadlines, err := checkDisableDeadlines()
+	if err != nil {
+		return nil, err
+	}
+
+	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
+	if err != nil {
+		return nil, err
+	}
+	client := FeedItemTargetClient{CallOptions: defaultFeedItemTargetCallOptions()}
+
+	c := &feedItemTargetGRPCClient{
+		connPool:             connPool,
+		disableDeadlines:     disableDeadlines,
+		feedItemTargetClient: servicespb.NewFeedItemTargetServiceClient(connPool),
+		CallOptions:          &client.CallOptions,
+	}
+	c.setGoogleClientInfo()
+
+	client.internalClient = c
+
+	return &client, nil
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *feedItemTargetGRPCClient) Connection() *grpc.ClientConn {
+	return c.connPool.Conn()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *feedItemTargetGRPCClient) setGoogleClientInfo(keyval ...string) {
+	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+}
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *feedItemTargetGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *feedItemTargetGRPCClient) GetFeedItemTarget(ctx context.Context, req *servicespb.GetFeedItemTargetRequest, opts ...gax.CallOption) (*resourcespb.FeedItemTarget, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).GetFeedItemTarget[0:len((*c.CallOptions).GetFeedItemTarget):len((*c.CallOptions).GetFeedItemTarget)], opts...)
+	var resp *resourcespb.FeedItemTarget
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.feedItemTargetClient.GetFeedItemTarget(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *feedItemTargetGRPCClient) MutateFeedItemTargets(ctx context.Context, req *servicespb.MutateFeedItemTargetsRequest, opts ...gax.CallOption) (*servicespb.MutateFeedItemTargetsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -220,7 +275,7 @@ func (c *FeedItemTargetClient) MutateFeedItemTargets(ctx context.Context, req *s
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateFeedItemTargets[0:len(c.CallOptions.MutateFeedItemTargets):len(c.CallOptions.MutateFeedItemTargets)], opts...)
+	opts = append((*c.CallOptions).MutateFeedItemTargets[0:len((*c.CallOptions).MutateFeedItemTargets):len((*c.CallOptions).MutateFeedItemTargets)], opts...)
 	var resp *servicespb.MutateFeedItemTargetsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

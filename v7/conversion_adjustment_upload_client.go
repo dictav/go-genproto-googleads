@@ -40,12 +40,13 @@ type ConversionAdjustmentUploadCallOptions struct {
 	UploadConversionAdjustments []gax.CallOption
 }
 
-func defaultConversionAdjustmentUploadClientOptions() []option.ClientOption {
+func defaultConversionAdjustmentUploadGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -69,32 +70,88 @@ func defaultConversionAdjustmentUploadCallOptions() *ConversionAdjustmentUploadC
 	}
 }
 
+// internalConversionAdjustmentUploadClient is an interface that defines the methods availaible from Google Ads API.
+type internalConversionAdjustmentUploadClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	UploadConversionAdjustments(context.Context, *servicespb.UploadConversionAdjustmentsRequest, ...gax.CallOption) (*servicespb.UploadConversionAdjustmentsResponse, error)
+}
+
 // ConversionAdjustmentUploadClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to upload conversion adjustments.
+type ConversionAdjustmentUploadClient struct {
+	// The internal transport-dependent client.
+	internalClient internalConversionAdjustmentUploadClient
+
+	// The call options for this service.
+	CallOptions *ConversionAdjustmentUploadCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *ConversionAdjustmentUploadClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *ConversionAdjustmentUploadClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *ConversionAdjustmentUploadClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// UploadConversionAdjustments processes the given conversion adjustments.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// PartialFailureError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *ConversionAdjustmentUploadClient) UploadConversionAdjustments(ctx context.Context, req *servicespb.UploadConversionAdjustmentsRequest, opts ...gax.CallOption) (*servicespb.UploadConversionAdjustmentsResponse, error) {
+	return c.internalClient.UploadConversionAdjustments(ctx, req, opts...)
+}
+
+// conversionAdjustmentUploadGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type ConversionAdjustmentUploadClient struct {
+type conversionAdjustmentUploadGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing ConversionAdjustmentUploadClient
+	CallOptions **ConversionAdjustmentUploadCallOptions
+
 	// The gRPC API client.
 	conversionAdjustmentUploadClient servicespb.ConversionAdjustmentUploadServiceClient
-
-	// The call options for this service.
-	CallOptions *ConversionAdjustmentUploadCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewConversionAdjustmentUploadClient creates a new conversion adjustment upload service client.
+// NewConversionAdjustmentUploadClient creates a new conversion adjustment upload service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // Service to upload conversion adjustments.
 func NewConversionAdjustmentUploadClient(ctx context.Context, opts ...option.ClientOption) (*ConversionAdjustmentUploadClient, error) {
-	clientOpts := defaultConversionAdjustmentUploadClientOptions()
-
+	clientOpts := defaultConversionAdjustmentUploadGRPCClientOptions()
 	if newConversionAdjustmentUploadClientHook != nil {
 		hookOpts, err := newConversionAdjustmentUploadClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -112,51 +169,44 @@ func NewConversionAdjustmentUploadClient(ctx context.Context, opts ...option.Cli
 	if err != nil {
 		return nil, err
 	}
-	c := &ConversionAdjustmentUploadClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultConversionAdjustmentUploadCallOptions(),
+	client := ConversionAdjustmentUploadClient{CallOptions: defaultConversionAdjustmentUploadCallOptions()}
 
+	c := &conversionAdjustmentUploadGRPCClient{
+		connPool:                         connPool,
+		disableDeadlines:                 disableDeadlines,
 		conversionAdjustmentUploadClient: servicespb.NewConversionAdjustmentUploadServiceClient(connPool),
+		CallOptions:                      &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *ConversionAdjustmentUploadClient) Connection() *grpc.ClientConn {
+func (c *conversionAdjustmentUploadGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *ConversionAdjustmentUploadClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *ConversionAdjustmentUploadClient) setGoogleClientInfo(keyval ...string) {
+func (c *conversionAdjustmentUploadGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// UploadConversionAdjustments processes the given conversion adjustments.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// PartialFailureError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *ConversionAdjustmentUploadClient) UploadConversionAdjustments(ctx context.Context, req *servicespb.UploadConversionAdjustmentsRequest, opts ...gax.CallOption) (*servicespb.UploadConversionAdjustmentsResponse, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *conversionAdjustmentUploadGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *conversionAdjustmentUploadGRPCClient) UploadConversionAdjustments(ctx context.Context, req *servicespb.UploadConversionAdjustmentsRequest, opts ...gax.CallOption) (*servicespb.UploadConversionAdjustmentsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -164,7 +214,7 @@ func (c *ConversionAdjustmentUploadClient) UploadConversionAdjustments(ctx conte
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.UploadConversionAdjustments[0:len(c.CallOptions.UploadConversionAdjustments):len(c.CallOptions.UploadConversionAdjustments)], opts...)
+	opts = append((*c.CallOptions).UploadConversionAdjustments[0:len((*c.CallOptions).UploadConversionAdjustments):len((*c.CallOptions).UploadConversionAdjustments)], opts...)
 	var resp *servicespb.UploadConversionAdjustmentsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

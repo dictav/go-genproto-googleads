@@ -41,12 +41,13 @@ type ShoppingPerformanceViewCallOptions struct {
 	GetShoppingPerformanceView []gax.CallOption
 }
 
-func defaultShoppingPerformanceViewClientOptions() []option.ClientOption {
+func defaultShoppingPerformanceViewGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -70,32 +71,87 @@ func defaultShoppingPerformanceViewCallOptions() *ShoppingPerformanceViewCallOpt
 	}
 }
 
+// internalShoppingPerformanceViewClient is an interface that defines the methods availaible from Google Ads API.
+type internalShoppingPerformanceViewClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetShoppingPerformanceView(context.Context, *servicespb.GetShoppingPerformanceViewRequest, ...gax.CallOption) (*resourcespb.ShoppingPerformanceView, error)
+}
+
 // ShoppingPerformanceViewClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to fetch Shopping performance views.
+type ShoppingPerformanceViewClient struct {
+	// The internal transport-dependent client.
+	internalClient internalShoppingPerformanceViewClient
+
+	// The call options for this service.
+	CallOptions *ShoppingPerformanceViewCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *ShoppingPerformanceViewClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *ShoppingPerformanceViewClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *ShoppingPerformanceViewClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// GetShoppingPerformanceView returns the requested Shopping performance view in full detail.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *ShoppingPerformanceViewClient) GetShoppingPerformanceView(ctx context.Context, req *servicespb.GetShoppingPerformanceViewRequest, opts ...gax.CallOption) (*resourcespb.ShoppingPerformanceView, error) {
+	return c.internalClient.GetShoppingPerformanceView(ctx, req, opts...)
+}
+
+// shoppingPerformanceViewGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type ShoppingPerformanceViewClient struct {
+type shoppingPerformanceViewGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing ShoppingPerformanceViewClient
+	CallOptions **ShoppingPerformanceViewCallOptions
+
 	// The gRPC API client.
 	shoppingPerformanceViewClient servicespb.ShoppingPerformanceViewServiceClient
-
-	// The call options for this service.
-	CallOptions *ShoppingPerformanceViewCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewShoppingPerformanceViewClient creates a new shopping performance view service client.
+// NewShoppingPerformanceViewClient creates a new shopping performance view service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // Service to fetch Shopping performance views.
 func NewShoppingPerformanceViewClient(ctx context.Context, opts ...option.ClientOption) (*ShoppingPerformanceViewClient, error) {
-	clientOpts := defaultShoppingPerformanceViewClientOptions()
-
+	clientOpts := defaultShoppingPerformanceViewGRPCClientOptions()
 	if newShoppingPerformanceViewClientHook != nil {
 		hookOpts, err := newShoppingPerformanceViewClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -113,50 +169,44 @@ func NewShoppingPerformanceViewClient(ctx context.Context, opts ...option.Client
 	if err != nil {
 		return nil, err
 	}
-	c := &ShoppingPerformanceViewClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultShoppingPerformanceViewCallOptions(),
+	client := ShoppingPerformanceViewClient{CallOptions: defaultShoppingPerformanceViewCallOptions()}
 
+	c := &shoppingPerformanceViewGRPCClient{
+		connPool:                      connPool,
+		disableDeadlines:              disableDeadlines,
 		shoppingPerformanceViewClient: servicespb.NewShoppingPerformanceViewServiceClient(connPool),
+		CallOptions:                   &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *ShoppingPerformanceViewClient) Connection() *grpc.ClientConn {
+func (c *shoppingPerformanceViewGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *ShoppingPerformanceViewClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *ShoppingPerformanceViewClient) setGoogleClientInfo(keyval ...string) {
+func (c *shoppingPerformanceViewGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// GetShoppingPerformanceView returns the requested Shopping performance view in full detail.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *ShoppingPerformanceViewClient) GetShoppingPerformanceView(ctx context.Context, req *servicespb.GetShoppingPerformanceViewRequest, opts ...gax.CallOption) (*resourcespb.ShoppingPerformanceView, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *shoppingPerformanceViewGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *shoppingPerformanceViewGRPCClient) GetShoppingPerformanceView(ctx context.Context, req *servicespb.GetShoppingPerformanceViewRequest, opts ...gax.CallOption) (*resourcespb.ShoppingPerformanceView, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -164,7 +214,7 @@ func (c *ShoppingPerformanceViewClient) GetShoppingPerformanceView(ctx context.C
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetShoppingPerformanceView[0:len(c.CallOptions.GetShoppingPerformanceView):len(c.CallOptions.GetShoppingPerformanceView)], opts...)
+	opts = append((*c.CallOptions).GetShoppingPerformanceView[0:len((*c.CallOptions).GetShoppingPerformanceView):len((*c.CallOptions).GetShoppingPerformanceView)], opts...)
 	var resp *resourcespb.ShoppingPerformanceView
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

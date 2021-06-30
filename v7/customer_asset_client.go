@@ -42,12 +42,13 @@ type CustomerAssetCallOptions struct {
 	MutateCustomerAssets []gax.CallOption
 }
 
-func defaultCustomerAssetClientOptions() []option.ClientOption {
+func defaultCustomerAssetGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -83,32 +84,105 @@ func defaultCustomerAssetCallOptions() *CustomerAssetCallOptions {
 	}
 }
 
+// internalCustomerAssetClient is an interface that defines the methods availaible from Google Ads API.
+type internalCustomerAssetClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetCustomerAsset(context.Context, *servicespb.GetCustomerAssetRequest, ...gax.CallOption) (*resourcespb.CustomerAsset, error)
+	MutateCustomerAssets(context.Context, *servicespb.MutateCustomerAssetsRequest, ...gax.CallOption) (*servicespb.MutateCustomerAssetsResponse, error)
+}
+
 // CustomerAssetClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage customer assets.
+type CustomerAssetClient struct {
+	// The internal transport-dependent client.
+	internalClient internalCustomerAssetClient
+
+	// The call options for this service.
+	CallOptions *CustomerAssetCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *CustomerAssetClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *CustomerAssetClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *CustomerAssetClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// GetCustomerAsset returns the requested customer asset in full detail.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *CustomerAssetClient) GetCustomerAsset(ctx context.Context, req *servicespb.GetCustomerAssetRequest, opts ...gax.CallOption) (*resourcespb.CustomerAsset, error) {
+	return c.internalClient.GetCustomerAsset(ctx, req, opts...)
+}
+
+// MutateCustomerAssets creates, updates, or removes customer assets. Operation statuses are
+// returned.
+//
+// List of thrown errors:
+// AssetLinkError (at )
+// AuthenticationError (at )
+// AuthorizationError (at )
+// FieldError (at )
+// HeaderError (at )
+// InternalError (at )
+// MutateError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *CustomerAssetClient) MutateCustomerAssets(ctx context.Context, req *servicespb.MutateCustomerAssetsRequest, opts ...gax.CallOption) (*servicespb.MutateCustomerAssetsResponse, error) {
+	return c.internalClient.MutateCustomerAssets(ctx, req, opts...)
+}
+
+// customerAssetGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type CustomerAssetClient struct {
+type customerAssetGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing CustomerAssetClient
+	CallOptions **CustomerAssetCallOptions
+
 	// The gRPC API client.
 	customerAssetClient servicespb.CustomerAssetServiceClient
-
-	// The call options for this service.
-	CallOptions *CustomerAssetCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewCustomerAssetClient creates a new customer asset service client.
+// NewCustomerAssetClient creates a new customer asset service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // Service to manage customer assets.
 func NewCustomerAssetClient(ctx context.Context, opts ...option.ClientOption) (*CustomerAssetClient, error) {
-	clientOpts := defaultCustomerAssetClientOptions()
-
+	clientOpts := defaultCustomerAssetGRPCClientOptions()
 	if newCustomerAssetClientHook != nil {
 		hookOpts, err := newCustomerAssetClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -126,50 +200,44 @@ func NewCustomerAssetClient(ctx context.Context, opts ...option.ClientOption) (*
 	if err != nil {
 		return nil, err
 	}
-	c := &CustomerAssetClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultCustomerAssetCallOptions(),
+	client := CustomerAssetClient{CallOptions: defaultCustomerAssetCallOptions()}
 
+	c := &customerAssetGRPCClient{
+		connPool:            connPool,
+		disableDeadlines:    disableDeadlines,
 		customerAssetClient: servicespb.NewCustomerAssetServiceClient(connPool),
+		CallOptions:         &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *CustomerAssetClient) Connection() *grpc.ClientConn {
+func (c *customerAssetGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *CustomerAssetClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *CustomerAssetClient) setGoogleClientInfo(keyval ...string) {
+func (c *customerAssetGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// GetCustomerAsset returns the requested customer asset in full detail.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *CustomerAssetClient) GetCustomerAsset(ctx context.Context, req *servicespb.GetCustomerAssetRequest, opts ...gax.CallOption) (*resourcespb.CustomerAsset, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *customerAssetGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *customerAssetGRPCClient) GetCustomerAsset(ctx context.Context, req *servicespb.GetCustomerAssetRequest, opts ...gax.CallOption) (*resourcespb.CustomerAsset, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -177,7 +245,7 @@ func (c *CustomerAssetClient) GetCustomerAsset(ctx context.Context, req *service
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetCustomerAsset[0:len(c.CallOptions.GetCustomerAsset):len(c.CallOptions.GetCustomerAsset)], opts...)
+	opts = append((*c.CallOptions).GetCustomerAsset[0:len((*c.CallOptions).GetCustomerAsset):len((*c.CallOptions).GetCustomerAsset)], opts...)
 	var resp *resourcespb.CustomerAsset
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
@@ -190,20 +258,7 @@ func (c *CustomerAssetClient) GetCustomerAsset(ctx context.Context, req *service
 	return resp, nil
 }
 
-// MutateCustomerAssets creates, updates, or removes customer assets. Operation statuses are
-// returned.
-//
-// List of thrown errors:
-// AssetLinkError (at )
-// AuthenticationError (at )
-// AuthorizationError (at )
-// FieldError (at )
-// HeaderError (at )
-// InternalError (at )
-// MutateError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *CustomerAssetClient) MutateCustomerAssets(ctx context.Context, req *servicespb.MutateCustomerAssetsRequest, opts ...gax.CallOption) (*servicespb.MutateCustomerAssetsResponse, error) {
+func (c *customerAssetGRPCClient) MutateCustomerAssets(ctx context.Context, req *servicespb.MutateCustomerAssetsRequest, opts ...gax.CallOption) (*servicespb.MutateCustomerAssetsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -211,7 +266,7 @@ func (c *CustomerAssetClient) MutateCustomerAssets(ctx context.Context, req *ser
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateCustomerAssets[0:len(c.CallOptions.MutateCustomerAssets):len(c.CallOptions.MutateCustomerAssets)], opts...)
+	opts = append((*c.CallOptions).MutateCustomerAssets[0:len((*c.CallOptions).MutateCustomerAssets):len((*c.CallOptions).MutateCustomerAssets)], opts...)
 	var resp *servicespb.MutateCustomerAssetsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

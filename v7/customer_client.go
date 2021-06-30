@@ -44,12 +44,13 @@ type CustomerCallOptions struct {
 	CreateCustomerClient    []gax.CallOption
 }
 
-func defaultCustomerClientOptions() []option.ClientOption {
+func defaultCustomerGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -109,81 +110,49 @@ func defaultCustomerCallOptions() *CustomerCallOptions {
 	}
 }
 
+// internalCustomerClient is an interface that defines the methods availaible from Google Ads API.
+type internalCustomerClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetCustomer(context.Context, *servicespb.GetCustomerRequest, ...gax.CallOption) (*resourcespb.Customer, error)
+	MutateCustomer(context.Context, *servicespb.MutateCustomerRequest, ...gax.CallOption) (*servicespb.MutateCustomerResponse, error)
+	ListAccessibleCustomers(context.Context, *servicespb.ListAccessibleCustomersRequest, ...gax.CallOption) (*servicespb.ListAccessibleCustomersResponse, error)
+	CreateCustomerClient(context.Context, *servicespb.CreateCustomerClientRequest, ...gax.CallOption) (*servicespb.CreateCustomerClientResponse, error)
+}
+
 // CustomerClient is a client for interacting with Google Ads API.
-//
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage customers.
 type CustomerClient struct {
-	// Connection pool of gRPC connections to the service.
-	connPool gtransport.ConnPool
-
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
-	// The gRPC API client.
-	customerClient servicespb.CustomerServiceClient
+	// The internal transport-dependent client.
+	internalClient internalCustomerClient
 
 	// The call options for this service.
 	CallOptions *CustomerCallOptions
-
-	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
 }
 
-// NewCustomerClient creates a new customer service client.
-//
-// Service to manage customers.
-func NewCustomerClient(ctx context.Context, opts ...option.ClientOption) (*CustomerClient, error) {
-	clientOpts := defaultCustomerClientOptions()
-
-	if newCustomerClientHook != nil {
-		hookOpts, err := newCustomerClientHook(ctx, clientHookParams{})
-		if err != nil {
-			return nil, err
-		}
-		clientOpts = append(clientOpts, hookOpts...)
-	}
-
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
-	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
-	if err != nil {
-		return nil, err
-	}
-	c := &CustomerClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultCustomerCallOptions(),
-
-		customerClient: servicespb.NewCustomerServiceClient(connPool),
-	}
-	c.setGoogleClientInfo()
-
-	return c, nil
-}
-
-// Connection returns a connection to the API service.
-//
-// Deprecated.
-func (c *CustomerClient) Connection() *grpc.ClientConn {
-	return c.connPool.Conn()
-}
+// Wrapper methods routed to the internal client.
 
 // Close closes the connection to the API service. The user should invoke this when
 // the client is no longer required.
 func (c *CustomerClient) Close() error {
-	return c.connPool.Close()
+	return c.internalClient.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *CustomerClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *CustomerClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
 }
 
 // GetCustomer returns the requested customer in full detail.
@@ -196,24 +165,7 @@ func (c *CustomerClient) setGoogleClientInfo(keyval ...string) {
 // QuotaError (at )
 // RequestError (at )
 func (c *CustomerClient) GetCustomer(ctx context.Context, req *servicespb.GetCustomerRequest, opts ...gax.CallOption) (*resourcespb.Customer, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetCustomer[0:len(c.CallOptions.GetCustomer):len(c.CallOptions.GetCustomer)], opts...)
-	var resp *resourcespb.Customer
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.customerClient.GetCustomer(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.GetCustomer(ctx, req, opts...)
 }
 
 // MutateCustomer updates a customer. Operation statuses are returned.
@@ -229,24 +181,7 @@ func (c *CustomerClient) GetCustomer(ctx context.Context, req *servicespb.GetCus
 // RequestError (at )
 // UrlFieldError (at )
 func (c *CustomerClient) MutateCustomer(ctx context.Context, req *servicespb.MutateCustomerRequest, opts ...gax.CallOption) (*servicespb.MutateCustomerResponse, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateCustomer[0:len(c.CallOptions.MutateCustomer):len(c.CallOptions.MutateCustomer)], opts...)
-	var resp *servicespb.MutateCustomerResponse
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.customerClient.MutateCustomer(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.MutateCustomer(ctx, req, opts...)
 }
 
 // ListAccessibleCustomers returns resource names of customers directly accessible by the
@@ -260,23 +195,7 @@ func (c *CustomerClient) MutateCustomer(ctx context.Context, req *servicespb.Mut
 // QuotaError (at )
 // RequestError (at )
 func (c *CustomerClient) ListAccessibleCustomers(ctx context.Context, req *servicespb.ListAccessibleCustomersRequest, opts ...gax.CallOption) (*servicespb.ListAccessibleCustomersResponse, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	ctx = insertMetadata(ctx, c.xGoogMetadata)
-	opts = append(c.CallOptions.ListAccessibleCustomers[0:len(c.CallOptions.ListAccessibleCustomers):len(c.CallOptions.ListAccessibleCustomers)], opts...)
-	var resp *servicespb.ListAccessibleCustomersResponse
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.customerClient.ListAccessibleCustomers(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.ListAccessibleCustomers(ctx, req, opts...)
 }
 
 // CreateCustomerClient creates a new client under manager. The new client customer is returned.
@@ -294,6 +213,111 @@ func (c *CustomerClient) ListAccessibleCustomers(ctx context.Context, req *servi
 // StringLengthError (at )
 // TimeZoneError (at )
 func (c *CustomerClient) CreateCustomerClient(ctx context.Context, req *servicespb.CreateCustomerClientRequest, opts ...gax.CallOption) (*servicespb.CreateCustomerClientResponse, error) {
+	return c.internalClient.CreateCustomerClient(ctx, req, opts...)
+}
+
+// customerGRPCClient is a client for interacting with Google Ads API over gRPC transport.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+type customerGRPCClient struct {
+	// Connection pool of gRPC connections to the service.
+	connPool gtransport.ConnPool
+
+	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
+	disableDeadlines bool
+
+	// Points back to the CallOptions field of the containing CustomerClient
+	CallOptions **CustomerCallOptions
+
+	// The gRPC API client.
+	customerClient servicespb.CustomerServiceClient
+
+	// The x-goog-* metadata to be sent with each request.
+	xGoogMetadata metadata.MD
+}
+
+// NewCustomerClient creates a new customer service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
+//
+// Service to manage customers.
+func NewCustomerClient(ctx context.Context, opts ...option.ClientOption) (*CustomerClient, error) {
+	clientOpts := defaultCustomerGRPCClientOptions()
+	if newCustomerClientHook != nil {
+		hookOpts, err := newCustomerClientHook(ctx, clientHookParams{})
+		if err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, hookOpts...)
+	}
+
+	disableDeadlines, err := checkDisableDeadlines()
+	if err != nil {
+		return nil, err
+	}
+
+	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
+	if err != nil {
+		return nil, err
+	}
+	client := CustomerClient{CallOptions: defaultCustomerCallOptions()}
+
+	c := &customerGRPCClient{
+		connPool:         connPool,
+		disableDeadlines: disableDeadlines,
+		customerClient:   servicespb.NewCustomerServiceClient(connPool),
+		CallOptions:      &client.CallOptions,
+	}
+	c.setGoogleClientInfo()
+
+	client.internalClient = c
+
+	return &client, nil
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *customerGRPCClient) Connection() *grpc.ClientConn {
+	return c.connPool.Conn()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *customerGRPCClient) setGoogleClientInfo(keyval ...string) {
+	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+}
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *customerGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *customerGRPCClient) GetCustomer(ctx context.Context, req *servicespb.GetCustomerRequest, opts ...gax.CallOption) (*resourcespb.Customer, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).GetCustomer[0:len((*c.CallOptions).GetCustomer):len((*c.CallOptions).GetCustomer)], opts...)
+	var resp *resourcespb.Customer
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.customerClient.GetCustomer(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *customerGRPCClient) MutateCustomer(ctx context.Context, req *servicespb.MutateCustomerRequest, opts ...gax.CallOption) (*servicespb.MutateCustomerResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -301,7 +325,48 @@ func (c *CustomerClient) CreateCustomerClient(ctx context.Context, req *services
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.CreateCustomerClient[0:len(c.CallOptions.CreateCustomerClient):len(c.CallOptions.CreateCustomerClient)], opts...)
+	opts = append((*c.CallOptions).MutateCustomer[0:len((*c.CallOptions).MutateCustomer):len((*c.CallOptions).MutateCustomer)], opts...)
+	var resp *servicespb.MutateCustomerResponse
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.customerClient.MutateCustomer(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *customerGRPCClient) ListAccessibleCustomers(ctx context.Context, req *servicespb.ListAccessibleCustomersRequest, opts ...gax.CallOption) (*servicespb.ListAccessibleCustomersResponse, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	ctx = insertMetadata(ctx, c.xGoogMetadata)
+	opts = append((*c.CallOptions).ListAccessibleCustomers[0:len((*c.CallOptions).ListAccessibleCustomers):len((*c.CallOptions).ListAccessibleCustomers)], opts...)
+	var resp *servicespb.ListAccessibleCustomersResponse
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.customerClient.ListAccessibleCustomers(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *customerGRPCClient) CreateCustomerClient(ctx context.Context, req *servicespb.CreateCustomerClientRequest, opts ...gax.CallOption) (*servicespb.CreateCustomerClientResponse, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).CreateCustomerClient[0:len((*c.CallOptions).CreateCustomerClient):len((*c.CallOptions).CreateCustomerClient)], opts...)
 	var resp *servicespb.CreateCustomerClientResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

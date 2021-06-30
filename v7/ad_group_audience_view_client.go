@@ -41,12 +41,13 @@ type AdGroupAudienceViewCallOptions struct {
 	GetAdGroupAudienceView []gax.CallOption
 }
 
-func defaultAdGroupAudienceViewClientOptions() []option.ClientOption {
+func defaultAdGroupAudienceViewGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -70,32 +71,87 @@ func defaultAdGroupAudienceViewCallOptions() *AdGroupAudienceViewCallOptions {
 	}
 }
 
+// internalAdGroupAudienceViewClient is an interface that defines the methods availaible from Google Ads API.
+type internalAdGroupAudienceViewClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetAdGroupAudienceView(context.Context, *servicespb.GetAdGroupAudienceViewRequest, ...gax.CallOption) (*resourcespb.AdGroupAudienceView, error)
+}
+
 // AdGroupAudienceViewClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage ad group audience views.
+type AdGroupAudienceViewClient struct {
+	// The internal transport-dependent client.
+	internalClient internalAdGroupAudienceViewClient
+
+	// The call options for this service.
+	CallOptions *AdGroupAudienceViewCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *AdGroupAudienceViewClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *AdGroupAudienceViewClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *AdGroupAudienceViewClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// GetAdGroupAudienceView returns the requested ad group audience view in full detail.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *AdGroupAudienceViewClient) GetAdGroupAudienceView(ctx context.Context, req *servicespb.GetAdGroupAudienceViewRequest, opts ...gax.CallOption) (*resourcespb.AdGroupAudienceView, error) {
+	return c.internalClient.GetAdGroupAudienceView(ctx, req, opts...)
+}
+
+// adGroupAudienceViewGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type AdGroupAudienceViewClient struct {
+type adGroupAudienceViewGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing AdGroupAudienceViewClient
+	CallOptions **AdGroupAudienceViewCallOptions
+
 	// The gRPC API client.
 	adGroupAudienceViewClient servicespb.AdGroupAudienceViewServiceClient
-
-	// The call options for this service.
-	CallOptions *AdGroupAudienceViewCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewAdGroupAudienceViewClient creates a new ad group audience view service client.
+// NewAdGroupAudienceViewClient creates a new ad group audience view service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // Service to manage ad group audience views.
 func NewAdGroupAudienceViewClient(ctx context.Context, opts ...option.ClientOption) (*AdGroupAudienceViewClient, error) {
-	clientOpts := defaultAdGroupAudienceViewClientOptions()
-
+	clientOpts := defaultAdGroupAudienceViewGRPCClientOptions()
 	if newAdGroupAudienceViewClientHook != nil {
 		hookOpts, err := newAdGroupAudienceViewClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -113,50 +169,44 @@ func NewAdGroupAudienceViewClient(ctx context.Context, opts ...option.ClientOpti
 	if err != nil {
 		return nil, err
 	}
-	c := &AdGroupAudienceViewClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultAdGroupAudienceViewCallOptions(),
+	client := AdGroupAudienceViewClient{CallOptions: defaultAdGroupAudienceViewCallOptions()}
 
+	c := &adGroupAudienceViewGRPCClient{
+		connPool:                  connPool,
+		disableDeadlines:          disableDeadlines,
 		adGroupAudienceViewClient: servicespb.NewAdGroupAudienceViewServiceClient(connPool),
+		CallOptions:               &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *AdGroupAudienceViewClient) Connection() *grpc.ClientConn {
+func (c *adGroupAudienceViewGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *AdGroupAudienceViewClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *AdGroupAudienceViewClient) setGoogleClientInfo(keyval ...string) {
+func (c *adGroupAudienceViewGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// GetAdGroupAudienceView returns the requested ad group audience view in full detail.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *AdGroupAudienceViewClient) GetAdGroupAudienceView(ctx context.Context, req *servicespb.GetAdGroupAudienceViewRequest, opts ...gax.CallOption) (*resourcespb.AdGroupAudienceView, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *adGroupAudienceViewGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *adGroupAudienceViewGRPCClient) GetAdGroupAudienceView(ctx context.Context, req *servicespb.GetAdGroupAudienceViewRequest, opts ...gax.CallOption) (*resourcespb.AdGroupAudienceView, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -164,7 +214,7 @@ func (c *AdGroupAudienceViewClient) GetAdGroupAudienceView(ctx context.Context, 
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetAdGroupAudienceView[0:len(c.CallOptions.GetAdGroupAudienceView):len(c.CallOptions.GetAdGroupAudienceView)], opts...)
+	opts = append((*c.CallOptions).GetAdGroupAudienceView[0:len((*c.CallOptions).GetAdGroupAudienceView):len((*c.CallOptions).GetAdGroupAudienceView)], opts...)
 	var resp *resourcespb.AdGroupAudienceView
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

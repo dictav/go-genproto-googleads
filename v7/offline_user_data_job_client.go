@@ -48,12 +48,13 @@ type OfflineUserDataJobCallOptions struct {
 	RunOfflineUserDataJob           []gax.CallOption
 }
 
-func defaultOfflineUserDataJobClientOptions() []option.ClientOption {
+func defaultOfflineUserDataJobGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -113,96 +114,55 @@ func defaultOfflineUserDataJobCallOptions() *OfflineUserDataJobCallOptions {
 	}
 }
 
+// internalOfflineUserDataJobClient is an interface that defines the methods availaible from Google Ads API.
+type internalOfflineUserDataJobClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	CreateOfflineUserDataJob(context.Context, *servicespb.CreateOfflineUserDataJobRequest, ...gax.CallOption) (*servicespb.CreateOfflineUserDataJobResponse, error)
+	GetOfflineUserDataJob(context.Context, *servicespb.GetOfflineUserDataJobRequest, ...gax.CallOption) (*resourcespb.OfflineUserDataJob, error)
+	AddOfflineUserDataJobOperations(context.Context, *servicespb.AddOfflineUserDataJobOperationsRequest, ...gax.CallOption) (*servicespb.AddOfflineUserDataJobOperationsResponse, error)
+	RunOfflineUserDataJob(context.Context, *servicespb.RunOfflineUserDataJobRequest, ...gax.CallOption) (*RunOfflineUserDataJobOperation, error)
+	RunOfflineUserDataJobOperation(name string) *RunOfflineUserDataJobOperation
+}
+
 // OfflineUserDataJobClient is a client for interacting with Google Ads API.
-//
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage offline user data jobs.
 type OfflineUserDataJobClient struct {
-	// Connection pool of gRPC connections to the service.
-	connPool gtransport.ConnPool
-
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
-	// The gRPC API client.
-	offlineUserDataJobClient servicespb.OfflineUserDataJobServiceClient
-
-	// LROClient is used internally to handle longrunning operations.
-	// It is exposed so that its CallOptions can be modified if required.
-	// Users should not Close this client.
-	LROClient *lroauto.OperationsClient
+	// The internal transport-dependent client.
+	internalClient internalOfflineUserDataJobClient
 
 	// The call options for this service.
 	CallOptions *OfflineUserDataJobCallOptions
 
-	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
+	// LROClient is used internally to handle long-running operations.
+	// It is exposed so that its CallOptions can be modified if required.
+	// Users should not Close this client.
+	LROClient *lroauto.OperationsClient
 }
 
-// NewOfflineUserDataJobClient creates a new offline user data job service client.
-//
-// Service to manage offline user data jobs.
-func NewOfflineUserDataJobClient(ctx context.Context, opts ...option.ClientOption) (*OfflineUserDataJobClient, error) {
-	clientOpts := defaultOfflineUserDataJobClientOptions()
-
-	if newOfflineUserDataJobClientHook != nil {
-		hookOpts, err := newOfflineUserDataJobClientHook(ctx, clientHookParams{})
-		if err != nil {
-			return nil, err
-		}
-		clientOpts = append(clientOpts, hookOpts...)
-	}
-
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
-	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
-	if err != nil {
-		return nil, err
-	}
-	c := &OfflineUserDataJobClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultOfflineUserDataJobCallOptions(),
-
-		offlineUserDataJobClient: servicespb.NewOfflineUserDataJobServiceClient(connPool),
-	}
-	c.setGoogleClientInfo()
-
-	c.LROClient, err = lroauto.NewOperationsClient(ctx, gtransport.WithConnPool(connPool))
-	if err != nil {
-		// This error "should not happen", since we are just reusing old connection pool
-		// and never actually need to dial.
-		// If this does happen, we could leak connp. However, we cannot close conn:
-		// If the user invoked the constructor with option.WithGRPCConn,
-		// we would close a connection that's still in use.
-		// TODO: investigate error conditions.
-		return nil, err
-	}
-	return c, nil
-}
-
-// Connection returns a connection to the API service.
-//
-// Deprecated.
-func (c *OfflineUserDataJobClient) Connection() *grpc.ClientConn {
-	return c.connPool.Conn()
-}
+// Wrapper methods routed to the internal client.
 
 // Close closes the connection to the API service. The user should invoke this when
 // the client is no longer required.
 func (c *OfflineUserDataJobClient) Close() error {
-	return c.connPool.Close()
+	return c.internalClient.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *OfflineUserDataJobClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *OfflineUserDataJobClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
 }
 
 // CreateOfflineUserDataJob creates an offline user data job.
@@ -219,24 +179,7 @@ func (c *OfflineUserDataJobClient) setGoogleClientInfo(keyval ...string) {
 // QuotaError (at )
 // RequestError (at )
 func (c *OfflineUserDataJobClient) CreateOfflineUserDataJob(ctx context.Context, req *servicespb.CreateOfflineUserDataJobRequest, opts ...gax.CallOption) (*servicespb.CreateOfflineUserDataJobResponse, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.CreateOfflineUserDataJob[0:len(c.CallOptions.CreateOfflineUserDataJob):len(c.CallOptions.CreateOfflineUserDataJob)], opts...)
-	var resp *servicespb.CreateOfflineUserDataJobResponse
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.offlineUserDataJobClient.CreateOfflineUserDataJob(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.CreateOfflineUserDataJob(ctx, req, opts...)
 }
 
 // GetOfflineUserDataJob returns the offline user data job.
@@ -249,24 +192,7 @@ func (c *OfflineUserDataJobClient) CreateOfflineUserDataJob(ctx context.Context,
 // QuotaError (at )
 // RequestError (at )
 func (c *OfflineUserDataJobClient) GetOfflineUserDataJob(ctx context.Context, req *servicespb.GetOfflineUserDataJobRequest, opts ...gax.CallOption) (*resourcespb.OfflineUserDataJob, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetOfflineUserDataJob[0:len(c.CallOptions.GetOfflineUserDataJob):len(c.CallOptions.GetOfflineUserDataJob)], opts...)
-	var resp *resourcespb.OfflineUserDataJob
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.offlineUserDataJobClient.GetOfflineUserDataJob(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.GetOfflineUserDataJob(ctx, req, opts...)
 }
 
 // AddOfflineUserDataJobOperations adds operations to the offline user data job.
@@ -283,24 +209,7 @@ func (c *OfflineUserDataJobClient) GetOfflineUserDataJob(ctx context.Context, re
 // QuotaError (at )
 // RequestError (at )
 func (c *OfflineUserDataJobClient) AddOfflineUserDataJobOperations(ctx context.Context, req *servicespb.AddOfflineUserDataJobOperationsRequest, opts ...gax.CallOption) (*servicespb.AddOfflineUserDataJobOperationsResponse, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.AddOfflineUserDataJobOperations[0:len(c.CallOptions.AddOfflineUserDataJobOperations):len(c.CallOptions.AddOfflineUserDataJobOperations)], opts...)
-	var resp *servicespb.AddOfflineUserDataJobOperationsResponse
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.offlineUserDataJobClient.AddOfflineUserDataJobOperations(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.AddOfflineUserDataJobOperations(ctx, req, opts...)
 }
 
 // RunOfflineUserDataJob runs the offline user data job.
@@ -318,6 +227,133 @@ func (c *OfflineUserDataJobClient) AddOfflineUserDataJobOperations(ctx context.C
 // QuotaError (at )
 // RequestError (at )
 func (c *OfflineUserDataJobClient) RunOfflineUserDataJob(ctx context.Context, req *servicespb.RunOfflineUserDataJobRequest, opts ...gax.CallOption) (*RunOfflineUserDataJobOperation, error) {
+	return c.internalClient.RunOfflineUserDataJob(ctx, req, opts...)
+}
+
+// RunOfflineUserDataJobOperation returns a new RunOfflineUserDataJobOperation from a given name.
+// The name must be that of a previously created RunOfflineUserDataJobOperation, possibly from a different process.
+func (c *OfflineUserDataJobClient) RunOfflineUserDataJobOperation(name string) *RunOfflineUserDataJobOperation {
+	return c.internalClient.RunOfflineUserDataJobOperation(name)
+}
+
+// offlineUserDataJobGRPCClient is a client for interacting with Google Ads API over gRPC transport.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+type offlineUserDataJobGRPCClient struct {
+	// Connection pool of gRPC connections to the service.
+	connPool gtransport.ConnPool
+
+	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
+	disableDeadlines bool
+
+	// Points back to the CallOptions field of the containing OfflineUserDataJobClient
+	CallOptions **OfflineUserDataJobCallOptions
+
+	// The gRPC API client.
+	offlineUserDataJobClient servicespb.OfflineUserDataJobServiceClient
+
+	// LROClient is used internally to handle long-running operations.
+	// It is exposed so that its CallOptions can be modified if required.
+	// Users should not Close this client.
+	LROClient **lroauto.OperationsClient
+
+	// The x-goog-* metadata to be sent with each request.
+	xGoogMetadata metadata.MD
+}
+
+// NewOfflineUserDataJobClient creates a new offline user data job service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
+//
+// Service to manage offline user data jobs.
+func NewOfflineUserDataJobClient(ctx context.Context, opts ...option.ClientOption) (*OfflineUserDataJobClient, error) {
+	clientOpts := defaultOfflineUserDataJobGRPCClientOptions()
+	if newOfflineUserDataJobClientHook != nil {
+		hookOpts, err := newOfflineUserDataJobClientHook(ctx, clientHookParams{})
+		if err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, hookOpts...)
+	}
+
+	disableDeadlines, err := checkDisableDeadlines()
+	if err != nil {
+		return nil, err
+	}
+
+	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
+	if err != nil {
+		return nil, err
+	}
+	client := OfflineUserDataJobClient{CallOptions: defaultOfflineUserDataJobCallOptions()}
+
+	c := &offlineUserDataJobGRPCClient{
+		connPool:                 connPool,
+		disableDeadlines:         disableDeadlines,
+		offlineUserDataJobClient: servicespb.NewOfflineUserDataJobServiceClient(connPool),
+		CallOptions:              &client.CallOptions,
+	}
+	c.setGoogleClientInfo()
+
+	client.internalClient = c
+
+	client.LROClient, err = lroauto.NewOperationsClient(ctx, gtransport.WithConnPool(connPool))
+	if err != nil {
+		// This error "should not happen", since we are just reusing old connection pool
+		// and never actually need to dial.
+		// If this does happen, we could leak connp. However, we cannot close conn:
+		// If the user invoked the constructor with option.WithGRPCConn,
+		// we would close a connection that's still in use.
+		// TODO: investigate error conditions.
+		return nil, err
+	}
+	c.LROClient = &client.LROClient
+	return &client, nil
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *offlineUserDataJobGRPCClient) Connection() *grpc.ClientConn {
+	return c.connPool.Conn()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *offlineUserDataJobGRPCClient) setGoogleClientInfo(keyval ...string) {
+	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+}
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *offlineUserDataJobGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *offlineUserDataJobGRPCClient) CreateOfflineUserDataJob(ctx context.Context, req *servicespb.CreateOfflineUserDataJobRequest, opts ...gax.CallOption) (*servicespb.CreateOfflineUserDataJobResponse, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).CreateOfflineUserDataJob[0:len((*c.CallOptions).CreateOfflineUserDataJob):len((*c.CallOptions).CreateOfflineUserDataJob)], opts...)
+	var resp *servicespb.CreateOfflineUserDataJobResponse
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.offlineUserDataJobClient.CreateOfflineUserDataJob(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *offlineUserDataJobGRPCClient) GetOfflineUserDataJob(ctx context.Context, req *servicespb.GetOfflineUserDataJobRequest, opts ...gax.CallOption) (*resourcespb.OfflineUserDataJob, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -325,7 +361,49 @@ func (c *OfflineUserDataJobClient) RunOfflineUserDataJob(ctx context.Context, re
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.RunOfflineUserDataJob[0:len(c.CallOptions.RunOfflineUserDataJob):len(c.CallOptions.RunOfflineUserDataJob)], opts...)
+	opts = append((*c.CallOptions).GetOfflineUserDataJob[0:len((*c.CallOptions).GetOfflineUserDataJob):len((*c.CallOptions).GetOfflineUserDataJob)], opts...)
+	var resp *resourcespb.OfflineUserDataJob
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.offlineUserDataJobClient.GetOfflineUserDataJob(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *offlineUserDataJobGRPCClient) AddOfflineUserDataJobOperations(ctx context.Context, req *servicespb.AddOfflineUserDataJobOperationsRequest, opts ...gax.CallOption) (*servicespb.AddOfflineUserDataJobOperationsResponse, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).AddOfflineUserDataJobOperations[0:len((*c.CallOptions).AddOfflineUserDataJobOperations):len((*c.CallOptions).AddOfflineUserDataJobOperations)], opts...)
+	var resp *servicespb.AddOfflineUserDataJobOperationsResponse
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.offlineUserDataJobClient.AddOfflineUserDataJobOperations(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *offlineUserDataJobGRPCClient) RunOfflineUserDataJob(ctx context.Context, req *servicespb.RunOfflineUserDataJobRequest, opts ...gax.CallOption) (*RunOfflineUserDataJobOperation, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).RunOfflineUserDataJob[0:len((*c.CallOptions).RunOfflineUserDataJob):len((*c.CallOptions).RunOfflineUserDataJob)], opts...)
 	var resp *longrunningpb.Operation
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
@@ -336,7 +414,7 @@ func (c *OfflineUserDataJobClient) RunOfflineUserDataJob(ctx context.Context, re
 		return nil, err
 	}
 	return &RunOfflineUserDataJobOperation{
-		lro: longrunning.InternalNewOperation(c.LROClient, resp),
+		lro: longrunning.InternalNewOperation(*c.LROClient, resp),
 	}, nil
 }
 
@@ -347,9 +425,9 @@ type RunOfflineUserDataJobOperation struct {
 
 // RunOfflineUserDataJobOperation returns a new RunOfflineUserDataJobOperation from a given name.
 // The name must be that of a previously created RunOfflineUserDataJobOperation, possibly from a different process.
-func (c *OfflineUserDataJobClient) RunOfflineUserDataJobOperation(name string) *RunOfflineUserDataJobOperation {
+func (c *offlineUserDataJobGRPCClient) RunOfflineUserDataJobOperation(name string) *RunOfflineUserDataJobOperation {
 	return &RunOfflineUserDataJobOperation{
-		lro: longrunning.InternalNewOperation(c.LROClient, &longrunningpb.Operation{Name: name}),
+		lro: longrunning.InternalNewOperation(*c.LROClient, &longrunningpb.Operation{Name: name}),
 	}
 }
 

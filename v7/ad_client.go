@@ -42,12 +42,13 @@ type AdCallOptions struct {
 	MutateAds []gax.CallOption
 }
 
-func defaultAdClientOptions() []option.ClientOption {
+func defaultAdGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -83,81 +84,47 @@ func defaultAdCallOptions() *AdCallOptions {
 	}
 }
 
+// internalAdClient is an interface that defines the methods availaible from Google Ads API.
+type internalAdClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetAd(context.Context, *servicespb.GetAdRequest, ...gax.CallOption) (*resourcespb.Ad, error)
+	MutateAds(context.Context, *servicespb.MutateAdsRequest, ...gax.CallOption) (*servicespb.MutateAdsResponse, error)
+}
+
 // AdClient is a client for interacting with Google Ads API.
-//
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage ads.
 type AdClient struct {
-	// Connection pool of gRPC connections to the service.
-	connPool gtransport.ConnPool
-
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
-	// The gRPC API client.
-	adClient servicespb.AdServiceClient
+	// The internal transport-dependent client.
+	internalClient internalAdClient
 
 	// The call options for this service.
 	CallOptions *AdCallOptions
-
-	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
 }
 
-// NewAdClient creates a new ad service client.
-//
-// Service to manage ads.
-func NewAdClient(ctx context.Context, opts ...option.ClientOption) (*AdClient, error) {
-	clientOpts := defaultAdClientOptions()
-
-	if newAdClientHook != nil {
-		hookOpts, err := newAdClientHook(ctx, clientHookParams{})
-		if err != nil {
-			return nil, err
-		}
-		clientOpts = append(clientOpts, hookOpts...)
-	}
-
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
-	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
-	if err != nil {
-		return nil, err
-	}
-	c := &AdClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultAdCallOptions(),
-
-		adClient: servicespb.NewAdServiceClient(connPool),
-	}
-	c.setGoogleClientInfo()
-
-	return c, nil
-}
-
-// Connection returns a connection to the API service.
-//
-// Deprecated.
-func (c *AdClient) Connection() *grpc.ClientConn {
-	return c.connPool.Conn()
-}
+// Wrapper methods routed to the internal client.
 
 // Close closes the connection to the API service. The user should invoke this when
 // the client is no longer required.
 func (c *AdClient) Close() error {
-	return c.connPool.Close()
+	return c.internalClient.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *AdClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *AdClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
 }
 
 // GetAd returns the requested ad in full detail.
@@ -170,24 +137,7 @@ func (c *AdClient) setGoogleClientInfo(keyval ...string) {
 // QuotaError (at )
 // RequestError (at )
 func (c *AdClient) GetAd(ctx context.Context, req *servicespb.GetAdRequest, opts ...gax.CallOption) (*resourcespb.Ad, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetAd[0:len(c.CallOptions.GetAd):len(c.CallOptions.GetAd)], opts...)
-	var resp *resourcespb.Ad
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.adClient.GetAd(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.GetAd(ctx, req, opts...)
 }
 
 // MutateAds updates ads. Operation statuses are returned. Updating ads is not supported
@@ -233,6 +183,111 @@ func (c *AdClient) GetAd(ctx context.Context, req *servicespb.GetAdRequest, opts
 // StringLengthError (at )
 // UrlFieldError (at )
 func (c *AdClient) MutateAds(ctx context.Context, req *servicespb.MutateAdsRequest, opts ...gax.CallOption) (*servicespb.MutateAdsResponse, error) {
+	return c.internalClient.MutateAds(ctx, req, opts...)
+}
+
+// adGRPCClient is a client for interacting with Google Ads API over gRPC transport.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+type adGRPCClient struct {
+	// Connection pool of gRPC connections to the service.
+	connPool gtransport.ConnPool
+
+	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
+	disableDeadlines bool
+
+	// Points back to the CallOptions field of the containing AdClient
+	CallOptions **AdCallOptions
+
+	// The gRPC API client.
+	adClient servicespb.AdServiceClient
+
+	// The x-goog-* metadata to be sent with each request.
+	xGoogMetadata metadata.MD
+}
+
+// NewAdClient creates a new ad service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
+//
+// Service to manage ads.
+func NewAdClient(ctx context.Context, opts ...option.ClientOption) (*AdClient, error) {
+	clientOpts := defaultAdGRPCClientOptions()
+	if newAdClientHook != nil {
+		hookOpts, err := newAdClientHook(ctx, clientHookParams{})
+		if err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, hookOpts...)
+	}
+
+	disableDeadlines, err := checkDisableDeadlines()
+	if err != nil {
+		return nil, err
+	}
+
+	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
+	if err != nil {
+		return nil, err
+	}
+	client := AdClient{CallOptions: defaultAdCallOptions()}
+
+	c := &adGRPCClient{
+		connPool:         connPool,
+		disableDeadlines: disableDeadlines,
+		adClient:         servicespb.NewAdServiceClient(connPool),
+		CallOptions:      &client.CallOptions,
+	}
+	c.setGoogleClientInfo()
+
+	client.internalClient = c
+
+	return &client, nil
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *adGRPCClient) Connection() *grpc.ClientConn {
+	return c.connPool.Conn()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *adGRPCClient) setGoogleClientInfo(keyval ...string) {
+	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+}
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *adGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *adGRPCClient) GetAd(ctx context.Context, req *servicespb.GetAdRequest, opts ...gax.CallOption) (*resourcespb.Ad, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).GetAd[0:len((*c.CallOptions).GetAd):len((*c.CallOptions).GetAd)], opts...)
+	var resp *resourcespb.Ad
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.adClient.GetAd(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *adGRPCClient) MutateAds(ctx context.Context, req *servicespb.MutateAdsRequest, opts ...gax.CallOption) (*servicespb.MutateAdsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -240,7 +295,7 @@ func (c *AdClient) MutateAds(ctx context.Context, req *servicespb.MutateAdsReque
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateAds[0:len(c.CallOptions.MutateAds):len(c.CallOptions.MutateAds)], opts...)
+	opts = append((*c.CallOptions).MutateAds[0:len((*c.CallOptions).MutateAds):len((*c.CallOptions).MutateAds)], opts...)
 	var resp *servicespb.MutateAdsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

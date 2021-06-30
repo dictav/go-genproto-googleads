@@ -42,12 +42,13 @@ type ConversionActionCallOptions struct {
 	MutateConversionActions []gax.CallOption
 }
 
-func defaultConversionActionClientOptions() []option.ClientOption {
+func defaultConversionActionGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -83,81 +84,47 @@ func defaultConversionActionCallOptions() *ConversionActionCallOptions {
 	}
 }
 
+// internalConversionActionClient is an interface that defines the methods availaible from Google Ads API.
+type internalConversionActionClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetConversionAction(context.Context, *servicespb.GetConversionActionRequest, ...gax.CallOption) (*resourcespb.ConversionAction, error)
+	MutateConversionActions(context.Context, *servicespb.MutateConversionActionsRequest, ...gax.CallOption) (*servicespb.MutateConversionActionsResponse, error)
+}
+
 // ConversionActionClient is a client for interacting with Google Ads API.
-//
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to manage conversion actions.
 type ConversionActionClient struct {
-	// Connection pool of gRPC connections to the service.
-	connPool gtransport.ConnPool
-
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
-	// The gRPC API client.
-	conversionActionClient servicespb.ConversionActionServiceClient
+	// The internal transport-dependent client.
+	internalClient internalConversionActionClient
 
 	// The call options for this service.
 	CallOptions *ConversionActionCallOptions
-
-	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
 }
 
-// NewConversionActionClient creates a new conversion action service client.
-//
-// Service to manage conversion actions.
-func NewConversionActionClient(ctx context.Context, opts ...option.ClientOption) (*ConversionActionClient, error) {
-	clientOpts := defaultConversionActionClientOptions()
-
-	if newConversionActionClientHook != nil {
-		hookOpts, err := newConversionActionClientHook(ctx, clientHookParams{})
-		if err != nil {
-			return nil, err
-		}
-		clientOpts = append(clientOpts, hookOpts...)
-	}
-
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
-	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
-	if err != nil {
-		return nil, err
-	}
-	c := &ConversionActionClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultConversionActionCallOptions(),
-
-		conversionActionClient: servicespb.NewConversionActionServiceClient(connPool),
-	}
-	c.setGoogleClientInfo()
-
-	return c, nil
-}
-
-// Connection returns a connection to the API service.
-//
-// Deprecated.
-func (c *ConversionActionClient) Connection() *grpc.ClientConn {
-	return c.connPool.Conn()
-}
+// Wrapper methods routed to the internal client.
 
 // Close closes the connection to the API service. The user should invoke this when
 // the client is no longer required.
 func (c *ConversionActionClient) Close() error {
-	return c.connPool.Close()
+	return c.internalClient.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *ConversionActionClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *ConversionActionClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
 }
 
 // GetConversionAction returns the requested conversion action.
@@ -170,24 +137,7 @@ func (c *ConversionActionClient) setGoogleClientInfo(keyval ...string) {
 // QuotaError (at )
 // RequestError (at )
 func (c *ConversionActionClient) GetConversionAction(ctx context.Context, req *servicespb.GetConversionActionRequest, opts ...gax.CallOption) (*resourcespb.ConversionAction, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetConversionAction[0:len(c.CallOptions.GetConversionAction):len(c.CallOptions.GetConversionAction)], opts...)
-	var resp *resourcespb.ConversionAction
-	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
-		var err error
-		resp, err = c.conversionActionClient.GetConversionAction(ctx, req, settings.GRPC...)
-		return err
-	}, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return resp, nil
+	return c.internalClient.GetConversionAction(ctx, req, opts...)
 }
 
 // MutateConversionActions creates, updates or removes conversion actions. Operation statuses are
@@ -211,6 +161,111 @@ func (c *ConversionActionClient) GetConversionAction(ctx context.Context, req *s
 // ResourceCountLimitExceededError (at )
 // StringLengthError (at )
 func (c *ConversionActionClient) MutateConversionActions(ctx context.Context, req *servicespb.MutateConversionActionsRequest, opts ...gax.CallOption) (*servicespb.MutateConversionActionsResponse, error) {
+	return c.internalClient.MutateConversionActions(ctx, req, opts...)
+}
+
+// conversionActionGRPCClient is a client for interacting with Google Ads API over gRPC transport.
+//
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+type conversionActionGRPCClient struct {
+	// Connection pool of gRPC connections to the service.
+	connPool gtransport.ConnPool
+
+	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
+	disableDeadlines bool
+
+	// Points back to the CallOptions field of the containing ConversionActionClient
+	CallOptions **ConversionActionCallOptions
+
+	// The gRPC API client.
+	conversionActionClient servicespb.ConversionActionServiceClient
+
+	// The x-goog-* metadata to be sent with each request.
+	xGoogMetadata metadata.MD
+}
+
+// NewConversionActionClient creates a new conversion action service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
+//
+// Service to manage conversion actions.
+func NewConversionActionClient(ctx context.Context, opts ...option.ClientOption) (*ConversionActionClient, error) {
+	clientOpts := defaultConversionActionGRPCClientOptions()
+	if newConversionActionClientHook != nil {
+		hookOpts, err := newConversionActionClientHook(ctx, clientHookParams{})
+		if err != nil {
+			return nil, err
+		}
+		clientOpts = append(clientOpts, hookOpts...)
+	}
+
+	disableDeadlines, err := checkDisableDeadlines()
+	if err != nil {
+		return nil, err
+	}
+
+	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
+	if err != nil {
+		return nil, err
+	}
+	client := ConversionActionClient{CallOptions: defaultConversionActionCallOptions()}
+
+	c := &conversionActionGRPCClient{
+		connPool:               connPool,
+		disableDeadlines:       disableDeadlines,
+		conversionActionClient: servicespb.NewConversionActionServiceClient(connPool),
+		CallOptions:            &client.CallOptions,
+	}
+	c.setGoogleClientInfo()
+
+	client.internalClient = c
+
+	return &client, nil
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *conversionActionGRPCClient) Connection() *grpc.ClientConn {
+	return c.connPool.Conn()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *conversionActionGRPCClient) setGoogleClientInfo(keyval ...string) {
+	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+}
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *conversionActionGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *conversionActionGRPCClient) GetConversionAction(ctx context.Context, req *servicespb.GetConversionActionRequest, opts ...gax.CallOption) (*resourcespb.ConversionAction, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).GetConversionAction[0:len((*c.CallOptions).GetConversionAction):len((*c.CallOptions).GetConversionAction)], opts...)
+	var resp *resourcespb.ConversionAction
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.conversionActionClient.GetConversionAction(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *conversionActionGRPCClient) MutateConversionActions(ctx context.Context, req *servicespb.MutateConversionActionsRequest, opts ...gax.CallOption) (*servicespb.MutateConversionActionsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -218,7 +273,7 @@ func (c *ConversionActionClient) MutateConversionActions(ctx context.Context, re
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.MutateConversionActions[0:len(c.CallOptions.MutateConversionActions):len(c.CallOptions.MutateConversionActions)], opts...)
+	opts = append((*c.CallOptions).MutateConversionActions[0:len((*c.CallOptions).MutateConversionActions):len((*c.CallOptions).MutateConversionActions)], opts...)
 	var resp *servicespb.MutateConversionActionsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error

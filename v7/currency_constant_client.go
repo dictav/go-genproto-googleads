@@ -41,12 +41,13 @@ type CurrencyConstantCallOptions struct {
 	GetCurrencyConstant []gax.CallOption
 }
 
-func defaultCurrencyConstantClientOptions() []option.ClientOption {
+func defaultCurrencyConstantGRPCClientOptions() []option.ClientOption {
 	return []option.ClientOption{
 		internaloption.WithDefaultEndpoint("googleads.googleapis.com:443"),
 		internaloption.WithDefaultMTLSEndpoint("googleads.mtls.googleapis.com:443"),
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
+		internaloption.EnableJwtWithScope(),
 		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
@@ -70,32 +71,87 @@ func defaultCurrencyConstantCallOptions() *CurrencyConstantCallOptions {
 	}
 }
 
+// internalCurrencyConstantClient is an interface that defines the methods availaible from Google Ads API.
+type internalCurrencyConstantClient interface {
+	Close() error
+	setGoogleClientInfo(...string)
+	Connection() *grpc.ClientConn
+	GetCurrencyConstant(context.Context, *servicespb.GetCurrencyConstantRequest, ...gax.CallOption) (*resourcespb.CurrencyConstant, error)
+}
+
 // CurrencyConstantClient is a client for interacting with Google Ads API.
+// Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
+//
+// Service to fetch currency constants.
+type CurrencyConstantClient struct {
+	// The internal transport-dependent client.
+	internalClient internalCurrencyConstantClient
+
+	// The call options for this service.
+	CallOptions *CurrencyConstantCallOptions
+}
+
+// Wrapper methods routed to the internal client.
+
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *CurrencyConstantClient) Close() error {
+	return c.internalClient.Close()
+}
+
+// setGoogleClientInfo sets the name and version of the application in
+// the `x-goog-api-client` header passed on each request. Intended for
+// use by Google-written clients.
+func (c *CurrencyConstantClient) setGoogleClientInfo(keyval ...string) {
+	c.internalClient.setGoogleClientInfo(keyval...)
+}
+
+// Connection returns a connection to the API service.
+//
+// Deprecated.
+func (c *CurrencyConstantClient) Connection() *grpc.ClientConn {
+	return c.internalClient.Connection()
+}
+
+// GetCurrencyConstant returns the requested currency constant.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *CurrencyConstantClient) GetCurrencyConstant(ctx context.Context, req *servicespb.GetCurrencyConstantRequest, opts ...gax.CallOption) (*resourcespb.CurrencyConstant, error) {
+	return c.internalClient.GetCurrencyConstant(ctx, req, opts...)
+}
+
+// currencyConstantGRPCClient is a client for interacting with Google Ads API over gRPC transport.
 //
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
-type CurrencyConstantClient struct {
+type currencyConstantGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
 	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
 	disableDeadlines bool
 
+	// Points back to the CallOptions field of the containing CurrencyConstantClient
+	CallOptions **CurrencyConstantCallOptions
+
 	// The gRPC API client.
 	currencyConstantClient servicespb.CurrencyConstantServiceClient
-
-	// The call options for this service.
-	CallOptions *CurrencyConstantCallOptions
 
 	// The x-goog-* metadata to be sent with each request.
 	xGoogMetadata metadata.MD
 }
 
-// NewCurrencyConstantClient creates a new currency constant service client.
+// NewCurrencyConstantClient creates a new currency constant service client based on gRPC.
+// The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // Service to fetch currency constants.
 func NewCurrencyConstantClient(ctx context.Context, opts ...option.ClientOption) (*CurrencyConstantClient, error) {
-	clientOpts := defaultCurrencyConstantClientOptions()
-
+	clientOpts := defaultCurrencyConstantGRPCClientOptions()
 	if newCurrencyConstantClientHook != nil {
 		hookOpts, err := newCurrencyConstantClientHook(ctx, clientHookParams{})
 		if err != nil {
@@ -113,50 +169,44 @@ func NewCurrencyConstantClient(ctx context.Context, opts ...option.ClientOption)
 	if err != nil {
 		return nil, err
 	}
-	c := &CurrencyConstantClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		CallOptions:      defaultCurrencyConstantCallOptions(),
+	client := CurrencyConstantClient{CallOptions: defaultCurrencyConstantCallOptions()}
 
+	c := &currencyConstantGRPCClient{
+		connPool:               connPool,
+		disableDeadlines:       disableDeadlines,
 		currencyConstantClient: servicespb.NewCurrencyConstantServiceClient(connPool),
+		CallOptions:            &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
-	return c, nil
+	client.internalClient = c
+
+	return &client, nil
 }
 
 // Connection returns a connection to the API service.
 //
 // Deprecated.
-func (c *CurrencyConstantClient) Connection() *grpc.ClientConn {
+func (c *currencyConstantGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
-}
-
-// Close closes the connection to the API service. The user should invoke this when
-// the client is no longer required.
-func (c *CurrencyConstantClient) Close() error {
-	return c.connPool.Close()
 }
 
 // setGoogleClientInfo sets the name and version of the application in
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
-func (c *CurrencyConstantClient) setGoogleClientInfo(keyval ...string) {
+func (c *currencyConstantGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
 	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
-// GetCurrencyConstant returns the requested currency constant.
-//
-// List of thrown errors:
-// AuthenticationError (at )
-// AuthorizationError (at )
-// HeaderError (at )
-// InternalError (at )
-// QuotaError (at )
-// RequestError (at )
-func (c *CurrencyConstantClient) GetCurrencyConstant(ctx context.Context, req *servicespb.GetCurrencyConstantRequest, opts ...gax.CallOption) (*resourcespb.CurrencyConstant, error) {
+// Close closes the connection to the API service. The user should invoke this when
+// the client is no longer required.
+func (c *currencyConstantGRPCClient) Close() error {
+	return c.connPool.Close()
+}
+
+func (c *currencyConstantGRPCClient) GetCurrencyConstant(ctx context.Context, req *servicespb.GetCurrencyConstantRequest, opts ...gax.CallOption) (*resourcespb.CurrencyConstant, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
 		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
 		defer cancel()
@@ -164,7 +214,7 @@ func (c *CurrencyConstantClient) GetCurrencyConstant(ctx context.Context, req *s
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
-	opts = append(c.CallOptions.GetCurrencyConstant[0:len(c.CallOptions.GetCurrencyConstant):len(c.CallOptions.GetCurrencyConstant)], opts...)
+	opts = append((*c.CallOptions).GetCurrencyConstant[0:len((*c.CallOptions).GetCurrencyConstant):len((*c.CallOptions).GetCurrencyConstant)], opts...)
 	var resp *resourcespb.CurrencyConstant
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
