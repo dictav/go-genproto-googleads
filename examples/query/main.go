@@ -15,8 +15,8 @@ import (
 	"google.golang.org/api/option"
 	"google.golang.org/grpc/metadata"
 
-	googleads "github.com/dictav/go-genproto-googleads/v7"
-	servicespb "google.golang.org/genproto/googleapis/ads/googleads/v7/services"
+	googleads "github.com/dictav/go-genproto-googleads/v8"
+	servicespb "google.golang.org/genproto/googleapis/ads/googleads/v8/services"
 )
 
 const (
