@@ -2,7 +2,7 @@ module github.com/dictav/go-genproto-googleads/pb
 
 go 1.16
 
-replace google.golang.org/genproto/googleapis/ads/googleads => ./
+replace google.golang.org/genproto/googleapis/ads/googleads => github.com/dictav/go-genproto-googleads/pb v0.0.0-20210701104557-0d23a41cd997
 
 require (
 	github.com/golang/protobuf v1.5.2
