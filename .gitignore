@@ -16,3 +16,6 @@ vendor/
 
 # direnv file
 .envrc
+
+build/
+googleapis/

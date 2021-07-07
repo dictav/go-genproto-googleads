@@ -18,7 +18,7 @@ This is Google Ads API Go Client. The sources is auto generated from the proto f
 I forked [googleapis/googleapis] and wrote patches for building Go Client of Google Ads API [here](https://github.com/dictav/googleapis).
 
 ```sh
-bazel build //google/ads/googleads/v7:gapi-ads-googleads-v7-go
+make all
 ```
 
 Enjoy!
