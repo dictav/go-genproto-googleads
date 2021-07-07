@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"flag"
 	"log"
 	"os"
 
@@ -15,8 +14,8 @@ import (
 	"google.golang.org/api/option"
 	"google.golang.org/grpc/metadata"
 
+	servicespb "github.com/dictav/go-genproto-googleads/pb/v8/services"
 	googleads "github.com/dictav/go-genproto-googleads/v8"
-	servicespb "google.golang.org/genproto/googleapis/ads/googleads/v8/services"
 )
 
 const (
@@ -32,18 +31,10 @@ var env struct {
 	LoginCustomerID string `env:"LOGIN_CUSTOMER_ID,required"`
 }
 
-var account = flag.String("account", "", "ad account to execute the query. (required)")
-
 func main() {
 	err := envdecode.Decode(&env)
 	if err != nil {
 		log.Fatalln(err)
-	}
-
-	flag.Parse()
-	if *account == "" {
-		flag.PrintDefaults()
-		os.Exit(1)
 	}
 
 	ctx := context.Background()
@@ -70,7 +61,7 @@ func main() {
 	}
 
 	req := &servicespb.SearchGoogleAdsRequest{
-		CustomerId: *account,
+		CustomerId: env.LoginCustomerID,
 		Query:      query,
 	}
 
@@ -95,17 +86,9 @@ func main() {
 
 const query = `
 SELECT
-  detail_placement_view.placement,
-  detail_placement_view.placement_type,
-  customer.id,
-  customer.descriptive_name,
-  campaign.id,
-  campaign.name,
-  metrics.impressions,
-  metrics.conversions
+  customer_client.id,
+	customer_client.descriptive_name,
+	customer_client.manager
 FROM
-  detail_placement_view
-WHERE
-  campaign.status = ENABLED
-  AND segments.date DURING LAST_7_DAYS
+  customer_client
 `

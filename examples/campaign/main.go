@@ -3,19 +3,22 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/joeshaw/envdecode"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc/metadata"
 
+	servicespb "github.com/dictav/go-genproto-googleads/pb/v8/services"
 	googleads "github.com/dictav/go-genproto-googleads/v8"
-	servicespb "google.golang.org/genproto/googleapis/ads/googleads/v8/services"
 )
 
 const (
@@ -33,7 +36,7 @@ var env struct {
 
 var (
 	accountID  = flag.Int("account", 0, "ad account id (required)")
-	campaignID = flag.Int("campaign", 0, "campaign id (required)")
+	campaignID = flag.Int("campaign", 0, "campaign id")
 )
 
 func main() {
@@ -43,7 +46,7 @@ func main() {
 	}
 
 	flag.Parse()
-	if *accountID == 0 || *campaignID == 0 {
+	if *accountID == 0 {
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
@@ -66,6 +69,15 @@ func main() {
 	ctx = metadata.AppendToOutgoingContext(ctx, "developer-token", env.DeveloperToken)
 	ctx = metadata.AppendToOutgoingContext(ctx, "login-customer-id", env.LoginCustomerID)
 
+	if *campaignID > 0 {
+		show(ctx, *campaignID, opts)
+		return
+	}
+
+	list(ctx, *accountID, opts)
+}
+
+func show(ctx context.Context, id int, opts []option.ClientOption) {
 	client, err := googleads.NewCampaignClient(ctx, opts...)
 	if err != nil {
 		log.Fatalln(err)
@@ -87,3 +99,41 @@ func main() {
 		log.Fatalln(err)
 	}
 }
+
+func list(ctx context.Context, id int, opts []option.ClientOption) {
+	client, err := googleads.NewClient(ctx, opts...)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	req := &servicespb.SearchGoogleAdsRequest{
+		CustomerId: strconv.Itoa(id),
+		Query:      query,
+	}
+
+	it := client.Search(ctx, req)
+	enc := json.NewEncoder(os.Stdout)
+
+	for {
+		row, err := it.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		if err := enc.Encode(row); err != nil {
+			log.Fatalln(err)
+		}
+	}
+}
+
+const query = `
+SELECT
+  campaign.id,
+	campaign.name
+FROM
+  campaign
+`
