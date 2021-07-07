@@ -23,7 +23,7 @@ package services
 import (
 	context "context"
 	proto "github.com/golang/protobuf/proto"
-	enums "google.golang.org/genproto/googleapis/ads/googleads/v8/enums"
+	enums "github.com/dictav/go-genproto-googleads/pb/v8/enums"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	status "google.golang.org/genproto/googleapis/rpc/status"
 	grpc "google.golang.org/grpc"

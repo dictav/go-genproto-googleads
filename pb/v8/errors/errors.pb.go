@@ -22,8 +22,8 @@ package errors
 
 import (
 	proto "github.com/golang/protobuf/proto"
-	common "google.golang.org/genproto/googleapis/ads/googleads/v8/common"
-	enums "google.golang.org/genproto/googleapis/ads/googleads/v8/enums"
+	common "github.com/dictav/go-genproto-googleads/pb/v8/common"
+	enums "github.com/dictav/go-genproto-googleads/pb/v8/enums"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"

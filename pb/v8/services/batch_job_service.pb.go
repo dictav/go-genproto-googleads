@@ -23,8 +23,8 @@ package services
 import (
 	context "context"
 	proto "github.com/golang/protobuf/proto"
-	enums "google.golang.org/genproto/googleapis/ads/googleads/v8/enums"
-	resources "google.golang.org/genproto/googleapis/ads/googleads/v8/resources"
+	enums "github.com/dictav/go-genproto-googleads/pb/v8/enums"
+	resources "github.com/dictav/go-genproto-googleads/pb/v8/resources"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	longrunning "google.golang.org/genproto/googleapis/longrunning"
 	status "google.golang.org/genproto/googleapis/rpc/status"

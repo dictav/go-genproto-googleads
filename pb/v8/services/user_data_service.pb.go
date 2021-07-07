@@ -23,7 +23,7 @@ package services
 import (
 	context "context"
 	proto "github.com/golang/protobuf/proto"
-	common "google.golang.org/genproto/googleapis/ads/googleads/v8/common"
+	common "github.com/dictav/go-genproto-googleads/pb/v8/common"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"

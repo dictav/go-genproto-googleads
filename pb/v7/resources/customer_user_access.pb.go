@@ -22,7 +22,7 @@ package resources
 
 import (
 	proto "github.com/golang/protobuf/proto"
-	enums "google.golang.org/genproto/googleapis/ads/googleads/v7/enums"
+	enums "github.com/dictav/go-genproto-googleads/pb/v7/enums"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"

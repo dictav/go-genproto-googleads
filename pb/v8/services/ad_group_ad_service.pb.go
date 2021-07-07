@@ -23,9 +23,9 @@ package services
 import (
 	context "context"
 	proto "github.com/golang/protobuf/proto"
-	common "google.golang.org/genproto/googleapis/ads/googleads/v8/common"
-	enums "google.golang.org/genproto/googleapis/ads/googleads/v8/enums"
-	resources "google.golang.org/genproto/googleapis/ads/googleads/v8/resources"
+	common "github.com/dictav/go-genproto-googleads/pb/v8/common"
+	enums "github.com/dictav/go-genproto-googleads/pb/v8/enums"
+	resources "github.com/dictav/go-genproto-googleads/pb/v8/resources"
 	_ "google.golang.org/genproto/googleapis/api/annotations"
 	status "google.golang.org/genproto/googleapis/rpc/status"
 	grpc "google.golang.org/grpc"

@@ -27,7 +27,7 @@ import (
 	"google.golang.org/api/option"
 	"google.golang.org/api/option/internaloption"
 	gtransport "google.golang.org/api/transport/grpc"
-	servicespb "google.golang.org/genproto/googleapis/ads/googleads/v8/services"
+	servicespb "github.com/dictav/go-genproto-googleads/pb/v8/services"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
