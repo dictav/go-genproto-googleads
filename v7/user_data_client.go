@@ -1,4 +1,4 @@
-// Copyright 2021 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -47,7 +47,6 @@ func defaultUserDataGRPCClientOptions() []option.ClientOption {
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
 		internaloption.EnableJwtWithScope(),
-		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
 	}
@@ -82,7 +81,6 @@ type internalUserDataClient interface {
 // Methods, except Close, may be called concurrently. However, fields must not be modified concurrently with method calls.
 //
 // Service to manage user data uploads.
-// Accessible only to customers on the allow-list.
 type UserDataClient struct {
 	// The internal transport-dependent client.
 	internalClient internalUserDataClient
@@ -155,7 +153,6 @@ type userDataGRPCClient struct {
 // The returned client must be Closed when it is done being used to clean up its underlying connections.
 //
 // Service to manage user data uploads.
-// Accessible only to customers on the allow-list.
 func NewUserDataClient(ctx context.Context, opts ...option.ClientOption) (*UserDataClient, error) {
 	clientOpts := defaultUserDataGRPCClientOptions()
 	if newUserDataClientHook != nil {

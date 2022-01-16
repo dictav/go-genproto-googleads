@@ -1,4 +1,4 @@
-// Copyright 2021 Google LLC
+// Copyright 2022 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -38,6 +38,7 @@ var newSmartCampaignSuggestClientHook clientHook
 // SmartCampaignSuggestCallOptions contains the retry settings for each method of SmartCampaignSuggestClient.
 type SmartCampaignSuggestCallOptions struct {
 	SuggestSmartCampaignBudgetOptions []gax.CallOption
+	SuggestSmartCampaignAd            []gax.CallOption
 }
 
 func defaultSmartCampaignSuggestGRPCClientOptions() []option.ClientOption {
@@ -47,7 +48,6 @@ func defaultSmartCampaignSuggestGRPCClientOptions() []option.ClientOption {
 		internaloption.WithDefaultAudience("https://googleads.googleapis.com/"),
 		internaloption.WithDefaultScopes(DefaultAuthScopes()...),
 		internaloption.EnableJwtWithScope(),
-		option.WithGRPCDialOption(grpc.WithDisableServiceConfig()),
 		option.WithGRPCDialOption(grpc.WithDefaultCallOptions(
 			grpc.MaxCallRecvMsgSize(math.MaxInt32))),
 	}
@@ -56,6 +56,18 @@ func defaultSmartCampaignSuggestGRPCClientOptions() []option.ClientOption {
 func defaultSmartCampaignSuggestCallOptions() *SmartCampaignSuggestCallOptions {
 	return &SmartCampaignSuggestCallOptions{
 		SuggestSmartCampaignBudgetOptions: []gax.CallOption{
+			gax.WithRetry(func() gax.Retryer {
+				return gax.OnCodes([]codes.Code{
+					codes.Unavailable,
+					codes.DeadlineExceeded,
+				}, gax.Backoff{
+					Initial:    5000 * time.Millisecond,
+					Max:        60000 * time.Millisecond,
+					Multiplier: 1.30,
+				})
+			}),
+		},
+		SuggestSmartCampaignAd: []gax.CallOption{
 			gax.WithRetry(func() gax.Retryer {
 				return gax.OnCodes([]codes.Code{
 					codes.Unavailable,
@@ -76,6 +88,7 @@ type internalSmartCampaignSuggestClient interface {
 	setGoogleClientInfo(...string)
 	Connection() *grpc.ClientConn
 	SuggestSmartCampaignBudgetOptions(context.Context, *servicespb.SuggestSmartCampaignBudgetOptionsRequest, ...gax.CallOption) (*servicespb.SuggestSmartCampaignBudgetOptionsResponse, error)
+	SuggestSmartCampaignAd(context.Context, *servicespb.SuggestSmartCampaignAdRequest, ...gax.CallOption) (*servicespb.SuggestSmartCampaignAdResponse, error)
 }
 
 // SmartCampaignSuggestClient is a client for interacting with Google Ads API.
@@ -115,6 +128,12 @@ func (c *SmartCampaignSuggestClient) Connection() *grpc.ClientConn {
 // SuggestSmartCampaignBudgetOptions returns BudgetOption suggestions.
 func (c *SmartCampaignSuggestClient) SuggestSmartCampaignBudgetOptions(ctx context.Context, req *servicespb.SuggestSmartCampaignBudgetOptionsRequest, opts ...gax.CallOption) (*servicespb.SuggestSmartCampaignBudgetOptionsResponse, error) {
 	return c.internalClient.SuggestSmartCampaignBudgetOptions(ctx, req, opts...)
+}
+
+// SuggestSmartCampaignAd suggests a Smart campaign ad compatible with the Ad family of resources,
+// based on data points such as targeting and the business to advertise.
+func (c *SmartCampaignSuggestClient) SuggestSmartCampaignAd(ctx context.Context, req *servicespb.SuggestSmartCampaignAdRequest, opts ...gax.CallOption) (*servicespb.SuggestSmartCampaignAdResponse, error) {
+	return c.internalClient.SuggestSmartCampaignAd(ctx, req, opts...)
 }
 
 // smartCampaignSuggestGRPCClient is a client for interacting with Google Ads API over gRPC transport.
@@ -210,6 +229,27 @@ func (c *smartCampaignSuggestGRPCClient) SuggestSmartCampaignBudgetOptions(ctx c
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
 		var err error
 		resp, err = c.smartCampaignSuggestClient.SuggestSmartCampaignBudgetOptions(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
+func (c *smartCampaignSuggestGRPCClient) SuggestSmartCampaignAd(ctx context.Context, req *servicespb.SuggestSmartCampaignAdRequest, opts ...gax.CallOption) (*servicespb.SuggestSmartCampaignAdResponse, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).SuggestSmartCampaignAd[0:len((*c.CallOptions).SuggestSmartCampaignAd):len((*c.CallOptions).SuggestSmartCampaignAd)], opts...)
+	var resp *servicespb.SuggestSmartCampaignAdResponse
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.smartCampaignSuggestClient.SuggestSmartCampaignAd(ctx, req, settings.GRPC...)
 		return err
 	}, opts...)
 	if err != nil {
