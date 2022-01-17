@@ -6,14 +6,14 @@
 >
 > https://groups.google.com/g/adwords-api/c/pZJyu8Ih3GI/m/1xZlFz4bAwAJ
 
+This is Google Ads API Go Client. The sources is auto generated from the proto files in [googleapis/googleapis].
+
+
 ## Install
 
 ```sh
 $ go mod edit -require github.com/dictav/go-genproto-googleads@v0.20220116.1
 ```
-
-This is Google Ads API Go Client. The sources is auto generated from the proto files in [googleapis/googleapis].
-
 
 ## How to generate
 
