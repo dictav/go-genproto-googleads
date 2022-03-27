@@ -1,7 +1,7 @@
 PKG := github.com/dictav/go-genproto-googleads
 GOOGLE_PROTO := google.golang.org/genproto/googleapis/ads/googleads
 
-TARGETS := v7 v8 v9
+TARGETS := v7 v8 v9 v10
 SRC := googleapis/bazel-bin/google/ads/googleads/$(VERSION)/gapi-ads-googleads-$(VERSION)-go.tar.gz
 
 all: $(TARGETS)
