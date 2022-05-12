@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -17,8 +16,8 @@ import (
 	"google.golang.org/api/option"
 	"google.golang.org/grpc/metadata"
 
-	servicespb "github.com/dictav/go-genproto-googleads/pb/v9/services"
-	googleads "github.com/dictav/go-genproto-googleads/v9"
+	servicespb "github.com/dictav/go-genproto-googleads/pb/v10/services"
+	googleads "github.com/dictav/go-genproto-googleads/v10"
 )
 
 const (
@@ -70,32 +69,42 @@ func main() {
 	ctx = metadata.AppendToOutgoingContext(ctx, "login-customer-id", env.LoginCustomerID)
 
 	if *campaignID > 0 {
-		show(ctx, *campaignID, opts)
+		show(ctx, *accountID, *campaignID, opts)
 		return
 	}
 
 	list(ctx, *accountID, opts)
 }
 
-func show(ctx context.Context, id int, opts []option.ClientOption) {
-	client, err := googleads.NewCampaignClient(ctx, opts...)
+func show(ctx context.Context, accountID, campaignID int, opts []option.ClientOption) {
+	log.Println("WARNING: it does not include BiddingStrategy")
+
+	client, err := googleads.NewClient(ctx, opts...)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	req := &servicespb.GetCampaignRequest{
-		ResourceName: fmt.Sprintf("customers/%d/campaigns/%d", *accountID, *campaignID),
+	_ = campaignID
+
+	req := &servicespb.SearchGoogleAdsRequest{
+		CustomerId: strconv.Itoa(accountID),
+		Query:      queryDetail + strconv.Itoa(campaignID),
 	}
 
-	res, err := client.GetCampaign(ctx, req)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
+	it := client.Search(ctx, req)
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 
-	if err := enc.Encode(res); err != nil {
+	row, err := it.Next()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	c := row.GetCampaign()
+	log.Printf("bidding_strategy: %#v\n", c.GetBiddingStrategy())
+	log.Printf("bidding_strategy_type: %#v\n", c.GetBiddingStrategyType())
+
+	if err := enc.Encode(c); err != nil {
 		log.Fatalln(err)
 	}
 }
@@ -132,8 +141,40 @@ func list(ctx context.Context, id int, opts []option.ClientOption) {
 
 const query = `
 SELECT
-  campaign.id,
+	campaign.id,
 	campaign.name
 FROM
   campaign
 `
+
+const queryDetail = `
+SELECT
+	campaign.id,
+	campaign.name,
+	campaign.status,
+	campaign.serving_status,
+	campaign.ad_serving_optimization_status,
+	campaign.advertising_channel_type,
+	campaign.advertising_channel_sub_type,
+	campaign.experiment_type,
+	campaign.base_campaign,
+	campaign.campaign_budget,
+	campaign.bidding_strategy_type,
+	campaign.start_date,
+	campaign.end_date,
+	campaign.payment_mode,
+	campaign.network_settings.target_google_search,
+	campaign.network_settings.target_search_network,
+	campaign.network_settings.target_content_network,
+	campaign.network_settings.target_partner_search_network,
+	campaign.geo_target_type_setting.positive_geo_target_type,
+	campaign.geo_target_type_setting.negative_geo_target_type,
+	campaign.app_campaign_setting.app_id,
+	campaign.app_campaign_setting.app_store,
+	campaign.app_campaign_setting.bidding_strategy_goal_type,
+	campaign.bidding_strategy,
+	campaign.bidding_strategy_type
+FROM
+	campaign
+WHERE
+	campaign.id =`
