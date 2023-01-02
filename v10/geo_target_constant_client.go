@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2023 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -67,7 +67,7 @@ func defaultGeoTargetConstantCallOptions() *GeoTargetConstantCallOptions {
 	}
 }
 
-// internalGeoTargetConstantClient is an interface that defines the methods availaible from Google Ads API.
+// internalGeoTargetConstantClient is an interface that defines the methods available from Google Ads API.
 type internalGeoTargetConstantClient interface {
 	Close() error
 	setGoogleClientInfo(...string)
@@ -104,7 +104,8 @@ func (c *GeoTargetConstantClient) setGoogleClientInfo(keyval ...string) {
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *GeoTargetConstantClient) Connection() *grpc.ClientConn {
 	return c.internalClient.Connection()
 }
@@ -183,7 +184,8 @@ func NewGeoTargetConstantClient(ctx context.Context, opts ...option.ClientOption
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *geoTargetConstantGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
 }
@@ -193,7 +195,7 @@ func (c *geoTargetConstantGRPCClient) Connection() *grpc.ClientConn {
 // use by Google-written clients.
 func (c *geoTargetConstantGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	kv = append(kv, "gapic", getVersionClient(), "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
@@ -205,7 +207,7 @@ func (c *geoTargetConstantGRPCClient) Close() error {
 
 func (c *geoTargetConstantGRPCClient) SuggestGeoTargetConstants(ctx context.Context, req *servicespb.SuggestGeoTargetConstantsRequest, opts ...gax.CallOption) (*servicespb.SuggestGeoTargetConstantsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}

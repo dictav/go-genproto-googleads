@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2023 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -82,7 +82,7 @@ func defaultCustomerManagerLinkCallOptions() *CustomerManagerLinkCallOptions {
 	}
 }
 
-// internalCustomerManagerLinkClient is an interface that defines the methods availaible from Google Ads API.
+// internalCustomerManagerLinkClient is an interface that defines the methods available from Google Ads API.
 type internalCustomerManagerLinkClient interface {
 	Close() error
 	setGoogleClientInfo(...string)
@@ -120,12 +120,13 @@ func (c *CustomerManagerLinkClient) setGoogleClientInfo(keyval ...string) {
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *CustomerManagerLinkClient) Connection() *grpc.ClientConn {
 	return c.internalClient.Connection()
 }
 
-// MutateCustomerManagerLink creates or updates customer manager links. Operation statuses are returned.
+// MutateCustomerManagerLink updates customer manager links. Operation statuses are returned.
 //
 // List of thrown errors:
 // AuthenticationError (at )
@@ -225,7 +226,8 @@ func NewCustomerManagerLinkClient(ctx context.Context, opts ...option.ClientOpti
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *customerManagerLinkGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
 }
@@ -235,7 +237,7 @@ func (c *customerManagerLinkGRPCClient) Connection() *grpc.ClientConn {
 // use by Google-written clients.
 func (c *customerManagerLinkGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	kv = append(kv, "gapic", getVersionClient(), "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
@@ -247,11 +249,12 @@ func (c *customerManagerLinkGRPCClient) Close() error {
 
 func (c *customerManagerLinkGRPCClient) MutateCustomerManagerLink(ctx context.Context, req *servicespb.MutateCustomerManagerLinkRequest, opts ...gax.CallOption) (*servicespb.MutateCustomerManagerLinkResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).MutateCustomerManagerLink[0:len((*c.CallOptions).MutateCustomerManagerLink):len((*c.CallOptions).MutateCustomerManagerLink)], opts...)
 	var resp *servicespb.MutateCustomerManagerLinkResponse
@@ -268,11 +271,12 @@ func (c *customerManagerLinkGRPCClient) MutateCustomerManagerLink(ctx context.Co
 
 func (c *customerManagerLinkGRPCClient) MoveManagerLink(ctx context.Context, req *servicespb.MoveManagerLinkRequest, opts ...gax.CallOption) (*servicespb.MoveManagerLinkResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).MoveManagerLink[0:len((*c.CallOptions).MoveManagerLink):len((*c.CallOptions).MoveManagerLink)], opts...)
 	var resp *servicespb.MoveManagerLinkResponse

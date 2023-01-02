@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2023 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -114,7 +114,7 @@ func defaultBatchJobCallOptions() *BatchJobCallOptions {
 	}
 }
 
-// internalBatchJobClient is an interface that defines the methods availaible from Google Ads API.
+// internalBatchJobClient is an interface that defines the methods available from Google Ads API.
 type internalBatchJobClient interface {
 	Close() error
 	setGoogleClientInfo(...string)
@@ -160,7 +160,8 @@ func (c *BatchJobClient) setGoogleClientInfo(keyval ...string) {
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *BatchJobClient) Connection() *grpc.ClientConn {
 	return c.internalClient.Connection()
 }
@@ -309,7 +310,8 @@ func NewBatchJobClient(ctx context.Context, opts ...option.ClientOption) (*Batch
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *batchJobGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
 }
@@ -319,7 +321,7 @@ func (c *batchJobGRPCClient) Connection() *grpc.ClientConn {
 // use by Google-written clients.
 func (c *batchJobGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	kv = append(kv, "gapic", getVersionClient(), "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
@@ -331,11 +333,12 @@ func (c *batchJobGRPCClient) Close() error {
 
 func (c *batchJobGRPCClient) MutateBatchJob(ctx context.Context, req *servicespb.MutateBatchJobRequest, opts ...gax.CallOption) (*servicespb.MutateBatchJobResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).MutateBatchJob[0:len((*c.CallOptions).MutateBatchJob):len((*c.CallOptions).MutateBatchJob)], opts...)
 	var resp *servicespb.MutateBatchJobResponse
@@ -352,6 +355,7 @@ func (c *batchJobGRPCClient) MutateBatchJob(ctx context.Context, req *servicespb
 
 func (c *batchJobGRPCClient) ListBatchJobResults(ctx context.Context, req *servicespb.ListBatchJobResultsRequest, opts ...gax.CallOption) *BatchJobResultIterator {
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).ListBatchJobResults[0:len((*c.CallOptions).ListBatchJobResults):len((*c.CallOptions).ListBatchJobResults)], opts...)
 	it := &BatchJobResultIterator{}
@@ -396,11 +400,12 @@ func (c *batchJobGRPCClient) ListBatchJobResults(ctx context.Context, req *servi
 
 func (c *batchJobGRPCClient) RunBatchJob(ctx context.Context, req *servicespb.RunBatchJobRequest, opts ...gax.CallOption) (*RunBatchJobOperation, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).RunBatchJob[0:len((*c.CallOptions).RunBatchJob):len((*c.CallOptions).RunBatchJob)], opts...)
 	var resp *longrunningpb.Operation
@@ -419,11 +424,12 @@ func (c *batchJobGRPCClient) RunBatchJob(ctx context.Context, req *servicespb.Ru
 
 func (c *batchJobGRPCClient) AddBatchJobOperations(ctx context.Context, req *servicespb.AddBatchJobOperationsRequest, opts ...gax.CallOption) (*servicespb.AddBatchJobOperationsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).AddBatchJobOperations[0:len((*c.CallOptions).AddBatchJobOperations):len((*c.CallOptions).AddBatchJobOperations)], opts...)
 	var resp *servicespb.AddBatchJobOperationsResponse

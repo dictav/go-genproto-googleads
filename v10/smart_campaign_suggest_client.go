@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2023 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -95,7 +95,7 @@ func defaultSmartCampaignSuggestCallOptions() *SmartCampaignSuggestCallOptions {
 	}
 }
 
-// internalSmartCampaignSuggestClient is an interface that defines the methods availaible from Google Ads API.
+// internalSmartCampaignSuggestClient is an interface that defines the methods available from Google Ads API.
 type internalSmartCampaignSuggestClient interface {
 	Close() error
 	setGoogleClientInfo(...string)
@@ -134,7 +134,8 @@ func (c *SmartCampaignSuggestClient) setGoogleClientInfo(keyval ...string) {
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *SmartCampaignSuggestClient) Connection() *grpc.ClientConn {
 	return c.internalClient.Connection()
 }
@@ -215,7 +216,8 @@ func NewSmartCampaignSuggestClient(ctx context.Context, opts ...option.ClientOpt
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *smartCampaignSuggestGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
 }
@@ -225,7 +227,7 @@ func (c *smartCampaignSuggestGRPCClient) Connection() *grpc.ClientConn {
 // use by Google-written clients.
 func (c *smartCampaignSuggestGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	kv = append(kv, "gapic", getVersionClient(), "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
@@ -237,11 +239,12 @@ func (c *smartCampaignSuggestGRPCClient) Close() error {
 
 func (c *smartCampaignSuggestGRPCClient) SuggestSmartCampaignBudgetOptions(ctx context.Context, req *servicespb.SuggestSmartCampaignBudgetOptionsRequest, opts ...gax.CallOption) (*servicespb.SuggestSmartCampaignBudgetOptionsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).SuggestSmartCampaignBudgetOptions[0:len((*c.CallOptions).SuggestSmartCampaignBudgetOptions):len((*c.CallOptions).SuggestSmartCampaignBudgetOptions)], opts...)
 	var resp *servicespb.SuggestSmartCampaignBudgetOptionsResponse
@@ -258,11 +261,12 @@ func (c *smartCampaignSuggestGRPCClient) SuggestSmartCampaignBudgetOptions(ctx c
 
 func (c *smartCampaignSuggestGRPCClient) SuggestSmartCampaignAd(ctx context.Context, req *servicespb.SuggestSmartCampaignAdRequest, opts ...gax.CallOption) (*servicespb.SuggestSmartCampaignAdResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).SuggestSmartCampaignAd[0:len((*c.CallOptions).SuggestSmartCampaignAd):len((*c.CallOptions).SuggestSmartCampaignAd)], opts...)
 	var resp *servicespb.SuggestSmartCampaignAdResponse
@@ -279,11 +283,12 @@ func (c *smartCampaignSuggestGRPCClient) SuggestSmartCampaignAd(ctx context.Cont
 
 func (c *smartCampaignSuggestGRPCClient) SuggestKeywordThemes(ctx context.Context, req *servicespb.SuggestKeywordThemesRequest, opts ...gax.CallOption) (*servicespb.SuggestKeywordThemesResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).SuggestKeywordThemes[0:len((*c.CallOptions).SuggestKeywordThemes):len((*c.CallOptions).SuggestKeywordThemes)], opts...)
 	var resp *servicespb.SuggestKeywordThemesResponse

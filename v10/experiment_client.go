@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2023 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -140,7 +140,7 @@ func defaultExperimentCallOptions() *ExperimentCallOptions {
 	}
 }
 
-// internalExperimentClient is an interface that defines the methods availaible from Google Ads API.
+// internalExperimentClient is an interface that defines the methods available from Google Ads API.
 type internalExperimentClient interface {
 	Close() error
 	setGoogleClientInfo(...string)
@@ -189,7 +189,8 @@ func (c *ExperimentClient) setGoogleClientInfo(keyval ...string) {
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *ExperimentClient) Connection() *grpc.ClientConn {
 	return c.internalClient.Connection()
 }
@@ -390,7 +391,8 @@ func NewExperimentClient(ctx context.Context, opts ...option.ClientOption) (*Exp
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *experimentGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
 }
@@ -400,7 +402,7 @@ func (c *experimentGRPCClient) Connection() *grpc.ClientConn {
 // use by Google-written clients.
 func (c *experimentGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	kv = append(kv, "gapic", getVersionClient(), "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
@@ -412,11 +414,12 @@ func (c *experimentGRPCClient) Close() error {
 
 func (c *experimentGRPCClient) MutateExperiments(ctx context.Context, req *servicespb.MutateExperimentsRequest, opts ...gax.CallOption) (*servicespb.MutateExperimentsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).MutateExperiments[0:len((*c.CallOptions).MutateExperiments):len((*c.CallOptions).MutateExperiments)], opts...)
 	var resp *servicespb.MutateExperimentsResponse
@@ -433,11 +436,12 @@ func (c *experimentGRPCClient) MutateExperiments(ctx context.Context, req *servi
 
 func (c *experimentGRPCClient) EndExperiment(ctx context.Context, req *servicespb.EndExperimentRequest, opts ...gax.CallOption) error {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "experiment", url.QueryEscape(req.GetExperiment())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).EndExperiment[0:len((*c.CallOptions).EndExperiment):len((*c.CallOptions).EndExperiment)], opts...)
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -450,6 +454,7 @@ func (c *experimentGRPCClient) EndExperiment(ctx context.Context, req *servicesp
 
 func (c *experimentGRPCClient) ListExperimentAsyncErrors(ctx context.Context, req *servicespb.ListExperimentAsyncErrorsRequest, opts ...gax.CallOption) *StatusIterator {
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).ListExperimentAsyncErrors[0:len((*c.CallOptions).ListExperimentAsyncErrors):len((*c.CallOptions).ListExperimentAsyncErrors)], opts...)
 	it := &StatusIterator{}
@@ -494,11 +499,12 @@ func (c *experimentGRPCClient) ListExperimentAsyncErrors(ctx context.Context, re
 
 func (c *experimentGRPCClient) GraduateExperiment(ctx context.Context, req *servicespb.GraduateExperimentRequest, opts ...gax.CallOption) error {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "experiment", url.QueryEscape(req.GetExperiment())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).GraduateExperiment[0:len((*c.CallOptions).GraduateExperiment):len((*c.CallOptions).GraduateExperiment)], opts...)
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -511,11 +517,12 @@ func (c *experimentGRPCClient) GraduateExperiment(ctx context.Context, req *serv
 
 func (c *experimentGRPCClient) ScheduleExperiment(ctx context.Context, req *servicespb.ScheduleExperimentRequest, opts ...gax.CallOption) (*ScheduleExperimentOperation, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).ScheduleExperiment[0:len((*c.CallOptions).ScheduleExperiment):len((*c.CallOptions).ScheduleExperiment)], opts...)
 	var resp *longrunningpb.Operation
@@ -534,11 +541,12 @@ func (c *experimentGRPCClient) ScheduleExperiment(ctx context.Context, req *serv
 
 func (c *experimentGRPCClient) PromoteExperiment(ctx context.Context, req *servicespb.PromoteExperimentRequest, opts ...gax.CallOption) (*PromoteExperimentOperation, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).PromoteExperiment[0:len((*c.CallOptions).PromoteExperiment):len((*c.CallOptions).PromoteExperiment)], opts...)
 	var resp *longrunningpb.Operation

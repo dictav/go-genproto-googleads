@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2023 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -96,7 +96,7 @@ func defaultMerchantCenterLinkCallOptions() *MerchantCenterLinkCallOptions {
 	}
 }
 
-// internalMerchantCenterLinkClient is an interface that defines the methods availaible from Google Ads API.
+// internalMerchantCenterLinkClient is an interface that defines the methods available from Google Ads API.
 type internalMerchantCenterLinkClient interface {
 	Close() error
 	setGoogleClientInfo(...string)
@@ -136,7 +136,8 @@ func (c *MerchantCenterLinkClient) setGoogleClientInfo(keyval ...string) {
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *MerchantCenterLinkClient) Connection() *grpc.ClientConn {
 	return c.internalClient.Connection()
 }
@@ -242,7 +243,8 @@ func NewMerchantCenterLinkClient(ctx context.Context, opts ...option.ClientOptio
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *merchantCenterLinkGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
 }
@@ -252,7 +254,7 @@ func (c *merchantCenterLinkGRPCClient) Connection() *grpc.ClientConn {
 // use by Google-written clients.
 func (c *merchantCenterLinkGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	kv = append(kv, "gapic", getVersionClient(), "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
@@ -264,11 +266,12 @@ func (c *merchantCenterLinkGRPCClient) Close() error {
 
 func (c *merchantCenterLinkGRPCClient) ListMerchantCenterLinks(ctx context.Context, req *servicespb.ListMerchantCenterLinksRequest, opts ...gax.CallOption) (*servicespb.ListMerchantCenterLinksResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).ListMerchantCenterLinks[0:len((*c.CallOptions).ListMerchantCenterLinks):len((*c.CallOptions).ListMerchantCenterLinks)], opts...)
 	var resp *servicespb.ListMerchantCenterLinksResponse
@@ -285,11 +288,12 @@ func (c *merchantCenterLinkGRPCClient) ListMerchantCenterLinks(ctx context.Conte
 
 func (c *merchantCenterLinkGRPCClient) GetMerchantCenterLink(ctx context.Context, req *servicespb.GetMerchantCenterLinkRequest, opts ...gax.CallOption) (*resourcespb.MerchantCenterLink, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).GetMerchantCenterLink[0:len((*c.CallOptions).GetMerchantCenterLink):len((*c.CallOptions).GetMerchantCenterLink)], opts...)
 	var resp *resourcespb.MerchantCenterLink
@@ -306,11 +310,12 @@ func (c *merchantCenterLinkGRPCClient) GetMerchantCenterLink(ctx context.Context
 
 func (c *merchantCenterLinkGRPCClient) MutateMerchantCenterLink(ctx context.Context, req *servicespb.MutateMerchantCenterLinkRequest, opts ...gax.CallOption) (*servicespb.MutateMerchantCenterLinkResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).MutateMerchantCenterLink[0:len((*c.CallOptions).MutateMerchantCenterLink):len((*c.CallOptions).MutateMerchantCenterLink)], opts...)
 	var resp *servicespb.MutateMerchantCenterLinkResponse

@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2023 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -99,7 +99,7 @@ func defaultOfflineUserDataJobCallOptions() *OfflineUserDataJobCallOptions {
 	}
 }
 
-// internalOfflineUserDataJobClient is an interface that defines the methods availaible from Google Ads API.
+// internalOfflineUserDataJobClient is an interface that defines the methods available from Google Ads API.
 type internalOfflineUserDataJobClient interface {
 	Close() error
 	setGoogleClientInfo(...string)
@@ -144,7 +144,8 @@ func (c *OfflineUserDataJobClient) setGoogleClientInfo(keyval ...string) {
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *OfflineUserDataJobClient) Connection() *grpc.ClientConn {
 	return c.internalClient.Connection()
 }
@@ -283,7 +284,8 @@ func NewOfflineUserDataJobClient(ctx context.Context, opts ...option.ClientOptio
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *offlineUserDataJobGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
 }
@@ -293,7 +295,7 @@ func (c *offlineUserDataJobGRPCClient) Connection() *grpc.ClientConn {
 // use by Google-written clients.
 func (c *offlineUserDataJobGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	kv = append(kv, "gapic", getVersionClient(), "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
@@ -305,11 +307,12 @@ func (c *offlineUserDataJobGRPCClient) Close() error {
 
 func (c *offlineUserDataJobGRPCClient) CreateOfflineUserDataJob(ctx context.Context, req *servicespb.CreateOfflineUserDataJobRequest, opts ...gax.CallOption) (*servicespb.CreateOfflineUserDataJobResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).CreateOfflineUserDataJob[0:len((*c.CallOptions).CreateOfflineUserDataJob):len((*c.CallOptions).CreateOfflineUserDataJob)], opts...)
 	var resp *servicespb.CreateOfflineUserDataJobResponse
@@ -326,11 +329,12 @@ func (c *offlineUserDataJobGRPCClient) CreateOfflineUserDataJob(ctx context.Cont
 
 func (c *offlineUserDataJobGRPCClient) AddOfflineUserDataJobOperations(ctx context.Context, req *servicespb.AddOfflineUserDataJobOperationsRequest, opts ...gax.CallOption) (*servicespb.AddOfflineUserDataJobOperationsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).AddOfflineUserDataJobOperations[0:len((*c.CallOptions).AddOfflineUserDataJobOperations):len((*c.CallOptions).AddOfflineUserDataJobOperations)], opts...)
 	var resp *servicespb.AddOfflineUserDataJobOperationsResponse
@@ -347,11 +351,12 @@ func (c *offlineUserDataJobGRPCClient) AddOfflineUserDataJobOperations(ctx conte
 
 func (c *offlineUserDataJobGRPCClient) RunOfflineUserDataJob(ctx context.Context, req *servicespb.RunOfflineUserDataJobRequest, opts ...gax.CallOption) (*RunOfflineUserDataJobOperation, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).RunOfflineUserDataJob[0:len((*c.CallOptions).RunOfflineUserDataJob):len((*c.CallOptions).RunOfflineUserDataJob)], opts...)
 	var resp *longrunningpb.Operation

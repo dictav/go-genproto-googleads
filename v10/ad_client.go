@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2023 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -83,7 +83,7 @@ func defaultAdCallOptions() *AdCallOptions {
 	}
 }
 
-// internalAdClient is an interface that defines the methods availaible from Google Ads API.
+// internalAdClient is an interface that defines the methods available from Google Ads API.
 type internalAdClient interface {
 	Close() error
 	setGoogleClientInfo(...string)
@@ -121,7 +121,8 @@ func (c *AdClient) setGoogleClientInfo(keyval ...string) {
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *AdClient) Connection() *grpc.ClientConn {
 	return c.internalClient.Connection()
 }
@@ -245,7 +246,8 @@ func NewAdClient(ctx context.Context, opts ...option.ClientOption) (*AdClient, e
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *adGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
 }
@@ -255,7 +257,7 @@ func (c *adGRPCClient) Connection() *grpc.ClientConn {
 // use by Google-written clients.
 func (c *adGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	kv = append(kv, "gapic", getVersionClient(), "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
@@ -267,11 +269,12 @@ func (c *adGRPCClient) Close() error {
 
 func (c *adGRPCClient) GetAd(ctx context.Context, req *servicespb.GetAdRequest, opts ...gax.CallOption) (*resourcespb.Ad, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).GetAd[0:len((*c.CallOptions).GetAd):len((*c.CallOptions).GetAd)], opts...)
 	var resp *resourcespb.Ad
@@ -288,11 +291,12 @@ func (c *adGRPCClient) GetAd(ctx context.Context, req *servicespb.GetAdRequest, 
 
 func (c *adGRPCClient) MutateAds(ctx context.Context, req *servicespb.MutateAdsRequest, opts ...gax.CallOption) (*servicespb.MutateAdsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).MutateAds[0:len((*c.CallOptions).MutateAds):len((*c.CallOptions).MutateAds)], opts...)
 	var resp *servicespb.MutateAdsResponse

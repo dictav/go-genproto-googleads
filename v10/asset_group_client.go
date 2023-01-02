@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2023 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -69,7 +69,7 @@ func defaultAssetGroupCallOptions() *AssetGroupCallOptions {
 	}
 }
 
-// internalAssetGroupClient is an interface that defines the methods availaible from Google Ads API.
+// internalAssetGroupClient is an interface that defines the methods available from Google Ads API.
 type internalAssetGroupClient interface {
 	Close() error
 	setGoogleClientInfo(...string)
@@ -106,7 +106,8 @@ func (c *AssetGroupClient) setGoogleClientInfo(keyval ...string) {
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *AssetGroupClient) Connection() *grpc.ClientConn {
 	return c.internalClient.Connection()
 }
@@ -177,7 +178,8 @@ func NewAssetGroupClient(ctx context.Context, opts ...option.ClientOption) (*Ass
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *assetGroupGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
 }
@@ -187,7 +189,7 @@ func (c *assetGroupGRPCClient) Connection() *grpc.ClientConn {
 // use by Google-written clients.
 func (c *assetGroupGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	kv = append(kv, "gapic", getVersionClient(), "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
@@ -199,11 +201,12 @@ func (c *assetGroupGRPCClient) Close() error {
 
 func (c *assetGroupGRPCClient) MutateAssetGroups(ctx context.Context, req *servicespb.MutateAssetGroupsRequest, opts ...gax.CallOption) (*servicespb.MutateAssetGroupsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).MutateAssetGroups[0:len((*c.CallOptions).MutateAssetGroups):len((*c.CallOptions).MutateAssetGroups)], opts...)
 	var resp *servicespb.MutateAssetGroupsResponse

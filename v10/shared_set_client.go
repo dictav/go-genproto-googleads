@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2023 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -69,7 +69,7 @@ func defaultSharedSetCallOptions() *SharedSetCallOptions {
 	}
 }
 
-// internalSharedSetClient is an interface that defines the methods availaible from Google Ads API.
+// internalSharedSetClient is an interface that defines the methods available from Google Ads API.
 type internalSharedSetClient interface {
 	Close() error
 	setGoogleClientInfo(...string)
@@ -106,7 +106,8 @@ func (c *SharedSetClient) setGoogleClientInfo(keyval ...string) {
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *SharedSetClient) Connection() *grpc.ClientConn {
 	return c.internalClient.Connection()
 }
@@ -201,7 +202,8 @@ func NewSharedSetClient(ctx context.Context, opts ...option.ClientOption) (*Shar
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *sharedSetGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
 }
@@ -211,7 +213,7 @@ func (c *sharedSetGRPCClient) Connection() *grpc.ClientConn {
 // use by Google-written clients.
 func (c *sharedSetGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	kv = append(kv, "gapic", getVersionClient(), "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
@@ -223,11 +225,12 @@ func (c *sharedSetGRPCClient) Close() error {
 
 func (c *sharedSetGRPCClient) MutateSharedSets(ctx context.Context, req *servicespb.MutateSharedSetsRequest, opts ...gax.CallOption) (*servicespb.MutateSharedSetsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).MutateSharedSets[0:len((*c.CallOptions).MutateSharedSets):len((*c.CallOptions).MutateSharedSets)], opts...)
 	var resp *servicespb.MutateSharedSetsResponse

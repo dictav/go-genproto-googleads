@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2023 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -39,7 +39,8 @@ var newKeywordPlanIdeaClientHook clientHook
 
 // KeywordPlanIdeaCallOptions contains the retry settings for each method of KeywordPlanIdeaClient.
 type KeywordPlanIdeaCallOptions struct {
-	GenerateKeywordIdeas []gax.CallOption
+	GenerateKeywordIdeas             []gax.CallOption
+	GenerateKeywordHistoricalMetrics []gax.CallOption
 }
 
 func defaultKeywordPlanIdeaGRPCClientOptions() []option.ClientOption {
@@ -68,15 +69,28 @@ func defaultKeywordPlanIdeaCallOptions() *KeywordPlanIdeaCallOptions {
 				})
 			}),
 		},
+		GenerateKeywordHistoricalMetrics: []gax.CallOption{
+			gax.WithRetry(func() gax.Retryer {
+				return gax.OnCodes([]codes.Code{
+					codes.Unavailable,
+					codes.DeadlineExceeded,
+				}, gax.Backoff{
+					Initial:    5000 * time.Millisecond,
+					Max:        60000 * time.Millisecond,
+					Multiplier: 1.30,
+				})
+			}),
+		},
 	}
 }
 
-// internalKeywordPlanIdeaClient is an interface that defines the methods availaible from Google Ads API.
+// internalKeywordPlanIdeaClient is an interface that defines the methods available from Google Ads API.
 type internalKeywordPlanIdeaClient interface {
 	Close() error
 	setGoogleClientInfo(...string)
 	Connection() *grpc.ClientConn
 	GenerateKeywordIdeas(context.Context, *servicespb.GenerateKeywordIdeasRequest, ...gax.CallOption) *GenerateKeywordIdeaResultIterator
+	GenerateKeywordHistoricalMetrics(context.Context, *servicespb.GenerateKeywordHistoricalMetricsRequest, ...gax.CallOption) (*servicespb.GenerateKeywordHistoricalMetricsResponse, error)
 }
 
 // KeywordPlanIdeaClient is a client for interacting with Google Ads API.
@@ -108,7 +122,8 @@ func (c *KeywordPlanIdeaClient) setGoogleClientInfo(keyval ...string) {
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *KeywordPlanIdeaClient) Connection() *grpc.ClientConn {
 	return c.internalClient.Connection()
 }
@@ -126,6 +141,20 @@ func (c *KeywordPlanIdeaClient) Connection() *grpc.ClientConn {
 // RequestError (at )
 func (c *KeywordPlanIdeaClient) GenerateKeywordIdeas(ctx context.Context, req *servicespb.GenerateKeywordIdeasRequest, opts ...gax.CallOption) *GenerateKeywordIdeaResultIterator {
 	return c.internalClient.GenerateKeywordIdeas(ctx, req, opts...)
+}
+
+// GenerateKeywordHistoricalMetrics returns a list of keyword historical metrics.
+//
+// List of thrown errors:
+// AuthenticationError (at )
+// AuthorizationError (at )
+// CollectionSizeError (at )
+// HeaderError (at )
+// InternalError (at )
+// QuotaError (at )
+// RequestError (at )
+func (c *KeywordPlanIdeaClient) GenerateKeywordHistoricalMetrics(ctx context.Context, req *servicespb.GenerateKeywordHistoricalMetricsRequest, opts ...gax.CallOption) (*servicespb.GenerateKeywordHistoricalMetricsResponse, error) {
+	return c.internalClient.GenerateKeywordHistoricalMetrics(ctx, req, opts...)
 }
 
 // keywordPlanIdeaGRPCClient is a client for interacting with Google Ads API over gRPC transport.
@@ -188,7 +217,8 @@ func NewKeywordPlanIdeaClient(ctx context.Context, opts ...option.ClientOption) 
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *keywordPlanIdeaGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
 }
@@ -198,7 +228,7 @@ func (c *keywordPlanIdeaGRPCClient) Connection() *grpc.ClientConn {
 // use by Google-written clients.
 func (c *keywordPlanIdeaGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	kv = append(kv, "gapic", getVersionClient(), "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
@@ -210,6 +240,7 @@ func (c *keywordPlanIdeaGRPCClient) Close() error {
 
 func (c *keywordPlanIdeaGRPCClient) GenerateKeywordIdeas(ctx context.Context, req *servicespb.GenerateKeywordIdeasRequest, opts ...gax.CallOption) *GenerateKeywordIdeaResultIterator {
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).GenerateKeywordIdeas[0:len((*c.CallOptions).GenerateKeywordIdeas):len((*c.CallOptions).GenerateKeywordIdeas)], opts...)
 	it := &GenerateKeywordIdeaResultIterator{}
@@ -250,6 +281,28 @@ func (c *keywordPlanIdeaGRPCClient) GenerateKeywordIdeas(ctx context.Context, re
 	it.pageInfo.Token = req.GetPageToken()
 
 	return it
+}
+
+func (c *keywordPlanIdeaGRPCClient) GenerateKeywordHistoricalMetrics(ctx context.Context, req *servicespb.GenerateKeywordHistoricalMetricsRequest, opts ...gax.CallOption) (*servicespb.GenerateKeywordHistoricalMetricsResponse, error) {
+	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
+		defer cancel()
+		ctx = cctx
+	}
+	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+
+	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	opts = append((*c.CallOptions).GenerateKeywordHistoricalMetrics[0:len((*c.CallOptions).GenerateKeywordHistoricalMetrics):len((*c.CallOptions).GenerateKeywordHistoricalMetrics)], opts...)
+	var resp *servicespb.GenerateKeywordHistoricalMetricsResponse
+	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
+		var err error
+		resp, err = c.keywordPlanIdeaClient.GenerateKeywordHistoricalMetrics(ctx, req, settings.GRPC...)
+		return err
+	}, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
 }
 
 // GenerateKeywordIdeaResultIterator manages a stream of *servicespb.GenerateKeywordIdeaResult.

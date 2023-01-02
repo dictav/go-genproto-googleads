@@ -1,4 +1,4 @@
-// Copyright 2022 Google LLC
+// Copyright 2023 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -108,7 +108,7 @@ func defaultReachPlanCallOptions() *ReachPlanCallOptions {
 	}
 }
 
-// internalReachPlanClient is an interface that defines the methods availaible from Google Ads API.
+// internalReachPlanClient is an interface that defines the methods available from Google Ads API.
 type internalReachPlanClient interface {
 	Close() error
 	setGoogleClientInfo(...string)
@@ -152,12 +152,13 @@ func (c *ReachPlanClient) setGoogleClientInfo(keyval ...string) {
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *ReachPlanClient) Connection() *grpc.ClientConn {
 	return c.internalClient.Connection()
 }
 
-// ListPlannableLocations returns the list of plannable locations (for example, countries & DMAs).
+// ListPlannableLocations returns the list of plannable locations (for example, countries).
 //
 // List of thrown errors:
 // AuthenticationError (at )
@@ -280,7 +281,8 @@ func NewReachPlanClient(ctx context.Context, opts ...option.ClientOption) (*Reac
 
 // Connection returns a connection to the API service.
 //
-// Deprecated.
+// Deprecated: Connections are now pooled so this method does not always
+// return the same resource.
 func (c *reachPlanGRPCClient) Connection() *grpc.ClientConn {
 	return c.connPool.Conn()
 }
@@ -290,7 +292,7 @@ func (c *reachPlanGRPCClient) Connection() *grpc.ClientConn {
 // use by Google-written clients.
 func (c *reachPlanGRPCClient) setGoogleClientInfo(keyval ...string) {
 	kv := append([]string{"gl-go", versionGo()}, keyval...)
-	kv = append(kv, "gapic", versionClient, "gax", gax.Version, "grpc", grpc.Version)
+	kv = append(kv, "gapic", getVersionClient(), "gax", gax.Version, "grpc", grpc.Version)
 	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
 }
 
@@ -302,7 +304,7 @@ func (c *reachPlanGRPCClient) Close() error {
 
 func (c *reachPlanGRPCClient) ListPlannableLocations(ctx context.Context, req *servicespb.ListPlannableLocationsRequest, opts ...gax.CallOption) (*servicespb.ListPlannableLocationsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
@@ -322,7 +324,7 @@ func (c *reachPlanGRPCClient) ListPlannableLocations(ctx context.Context, req *s
 
 func (c *reachPlanGRPCClient) ListPlannableProducts(ctx context.Context, req *servicespb.ListPlannableProductsRequest, opts ...gax.CallOption) (*servicespb.ListPlannableProductsResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
@@ -342,11 +344,12 @@ func (c *reachPlanGRPCClient) ListPlannableProducts(ctx context.Context, req *se
 
 func (c *reachPlanGRPCClient) GenerateProductMixIdeas(ctx context.Context, req *servicespb.GenerateProductMixIdeasRequest, opts ...gax.CallOption) (*servicespb.GenerateProductMixIdeasResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).GenerateProductMixIdeas[0:len((*c.CallOptions).GenerateProductMixIdeas):len((*c.CallOptions).GenerateProductMixIdeas)], opts...)
 	var resp *servicespb.GenerateProductMixIdeasResponse
@@ -363,11 +366,12 @@ func (c *reachPlanGRPCClient) GenerateProductMixIdeas(ctx context.Context, req *
 
 func (c *reachPlanGRPCClient) GenerateReachForecast(ctx context.Context, req *servicespb.GenerateReachForecastRequest, opts ...gax.CallOption) (*servicespb.GenerateReachForecastResponse, error) {
 	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 3600000*time.Millisecond)
+		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
 		defer cancel()
 		ctx = cctx
 	}
 	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+
 	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
 	opts = append((*c.CallOptions).GenerateReachForecast[0:len((*c.CallOptions).GenerateReachForecast):len((*c.CallOptions).GenerateReachForecast)], opts...)
 	var resp *servicespb.GenerateReachForecastResponse
