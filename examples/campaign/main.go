@@ -16,8 +16,8 @@ import (
 	"google.golang.org/api/option"
 	"google.golang.org/grpc/metadata"
 
-	servicespb "github.com/dictav/go-genproto-googleads/pb/v10/services"
-	googleads "github.com/dictav/go-genproto-googleads/v10"
+	servicespb "github.com/dictav/go-genproto-googleads/pb/v12/services"
+	googleads "github.com/dictav/go-genproto-googleads/v12"
 )
 
 const (
@@ -142,9 +142,24 @@ func list(ctx context.Context, id int, opts []option.ClientOption) {
 const query = `
 SELECT
 	campaign.id,
-	campaign.name
+	campaign.name,
+	campaign.advertising_channel_type,
+	campaign.advertising_channel_sub_type,
+	campaign.status,
+	campaign.serving_status,
+	campaign.start_date,
+	campaign.end_date,
+	ad_group.id,
+	ad_group.name,
+	ad_group.type
 FROM
-  campaign
+	ad_group
+WHERE
+	campaign.status IN (ENABLED, PAUSED)
+AND
+	ad_group.status = ENABLED
+ORDER BY
+	campaign.end_date DESC
 `
 
 const queryDetail = `

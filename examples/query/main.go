@@ -1,11 +1,16 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
+	"fmt"
+	"io"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/joeshaw/envdecode"
 	"golang.org/x/oauth2"
@@ -31,10 +36,37 @@ var env struct {
 	LoginCustomerID string `env:"LOGIN_CUSTOMER_ID,required"`
 }
 
+var (
+	accountID = flag.Int("account", 0, "ad account id (required)")
+)
+
 func main() {
 	err := envdecode.Decode(&env)
 	if err != nil {
 		log.Fatalln(err)
+	}
+
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s [options] FILE\n", os.Args[0])
+		flag.PrintDefaults()
+	}
+
+	flag.Parse()
+
+	if *accountID == 0 {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	f := os.Stdin
+
+	if fn := flag.Arg(0); fn != "" {
+		var err error
+		if f, err = os.Open(fn); err != nil {
+			log.Println(err)
+			flag.Usage()
+			os.Exit(1)
+		}
 	}
 
 	ctx := context.Background()
@@ -55,14 +87,23 @@ func main() {
 	ctx = metadata.AppendToOutgoingContext(ctx, "developer-token", env.DeveloperToken)
 	ctx = metadata.AppendToOutgoingContext(ctx, "login-customer-id", env.LoginCustomerID)
 
+	execQuery(ctx, *accountID, f, opts)
+}
+
+func execQuery(ctx context.Context, id int, r io.Reader, opts []option.ClientOption) {
+	var buf bytes.Buffer
+	if _, err := io.Copy(&buf, r); err != nil {
+		log.Fatal(err)
+	}
+
 	client, err := googleads.NewClient(ctx, opts...)
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	req := &servicespb.SearchGoogleAdsRequest{
-		CustomerId: env.LoginCustomerID,
-		Query:      query,
+		CustomerId: strconv.Itoa(id),
+		Query:      buf.String(),
 	}
 
 	it := client.Search(ctx, req)
@@ -83,14 +124,3 @@ func main() {
 		}
 	}
 }
-
-const query = `
-SELECT
-	customer_client.id,
-	customer_client.descriptive_name,
-	customer_client.manager
-FROM
-	customer_client
-WHERE
-	customer_client.status = ENABLED
-`

@@ -23,3 +23,7 @@ $ go run ./account/main.go
 ```
 $ go run ./campaign/main.go -account=<AD_ACCOUNT_ID> -campaign=<CAMPAIGN_ID>
 ```
+
+```
+$ go run ./query/main.go -account=<AD_ACCOUNT_ID> FILE
+```
