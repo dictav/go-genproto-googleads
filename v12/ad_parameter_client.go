@@ -30,7 +30,6 @@ import (
 	servicespb "github.com/dictav/go-genproto-googleads/pb/v12/services"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 )
 
 var newAdParameterClientHook clientHook
@@ -55,6 +54,7 @@ func defaultAdParameterGRPCClientOptions() []option.ClientOption {
 func defaultAdParameterCallOptions() *AdParameterCallOptions {
 	return &AdParameterCallOptions{
 		MutateAdParameters: []gax.CallOption{
+			gax.WithTimeout(14400000 * time.Millisecond),
 			gax.WithRetry(func() gax.Retryer {
 				return gax.OnCodes([]codes.Code{
 					codes.Unavailable,
@@ -139,9 +139,6 @@ type adParameterGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
 	// Points back to the CallOptions field of the containing AdParameterClient
 	CallOptions **AdParameterCallOptions
 
@@ -149,7 +146,7 @@ type adParameterGRPCClient struct {
 	adParameterClient servicespb.AdParameterServiceClient
 
 	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
+	xGoogHeaders []string
 }
 
 // NewAdParameterClient creates a new ad parameter service client based on gRPC.
@@ -166,11 +163,6 @@ func NewAdParameterClient(ctx context.Context, opts ...option.ClientOption) (*Ad
 		clientOpts = append(clientOpts, hookOpts...)
 	}
 
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
 	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
 	if err != nil {
 		return nil, err
@@ -179,7 +171,6 @@ func NewAdParameterClient(ctx context.Context, opts ...option.ClientOption) (*Ad
 
 	c := &adParameterGRPCClient{
 		connPool:          connPool,
-		disableDeadlines:  disableDeadlines,
 		adParameterClient: servicespb.NewAdParameterServiceClient(connPool),
 		CallOptions:       &client.CallOptions,
 	}
@@ -202,9 +193,9 @@ func (c *adParameterGRPCClient) Connection() *grpc.ClientConn {
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *adParameterGRPCClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv := append([]string{"gl-go", gax.GoVersion}, keyval...)
 	kv = append(kv, "gapic", getVersionClient(), "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.xGoogHeaders = []string{"x-goog-api-client", gax.XGoogHeader(kv...)}
 }
 
 // Close closes the connection to the API service. The user should invoke this when
@@ -214,14 +205,10 @@ func (c *adParameterGRPCClient) Close() error {
 }
 
 func (c *adParameterGRPCClient) MutateAdParameters(ctx context.Context, req *servicespb.MutateAdParametersRequest, opts ...gax.CallOption) (*servicespb.MutateAdParametersResponse, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+	hds := []string{"x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId()))}
 
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	hds = append(c.xGoogHeaders, hds...)
+	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
 	opts = append((*c.CallOptions).MutateAdParameters[0:len((*c.CallOptions).MutateAdParameters):len((*c.CallOptions).MutateAdParameters)], opts...)
 	var resp *servicespb.MutateAdParametersResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {

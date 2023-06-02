@@ -30,7 +30,6 @@ import (
 	servicespb "github.com/dictav/go-genproto-googleads/pb/v12/services"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 )
 
 var newKeywordPlanClientHook clientHook
@@ -59,6 +58,7 @@ func defaultKeywordPlanGRPCClientOptions() []option.ClientOption {
 func defaultKeywordPlanCallOptions() *KeywordPlanCallOptions {
 	return &KeywordPlanCallOptions{
 		MutateKeywordPlans: []gax.CallOption{
+			gax.WithTimeout(14400000 * time.Millisecond),
 			gax.WithRetry(func() gax.Retryer {
 				return gax.OnCodes([]codes.Code{
 					codes.Unavailable,
@@ -71,6 +71,7 @@ func defaultKeywordPlanCallOptions() *KeywordPlanCallOptions {
 			}),
 		},
 		GenerateForecastCurve: []gax.CallOption{
+			gax.WithTimeout(14400000 * time.Millisecond),
 			gax.WithRetry(func() gax.Retryer {
 				return gax.OnCodes([]codes.Code{
 					codes.Unavailable,
@@ -83,6 +84,7 @@ func defaultKeywordPlanCallOptions() *KeywordPlanCallOptions {
 			}),
 		},
 		GenerateForecastTimeSeries: []gax.CallOption{
+			gax.WithTimeout(14400000 * time.Millisecond),
 			gax.WithRetry(func() gax.Retryer {
 				return gax.OnCodes([]codes.Code{
 					codes.Unavailable,
@@ -95,6 +97,7 @@ func defaultKeywordPlanCallOptions() *KeywordPlanCallOptions {
 			}),
 		},
 		GenerateForecastMetrics: []gax.CallOption{
+			gax.WithTimeout(14400000 * time.Millisecond),
 			gax.WithRetry(func() gax.Retryer {
 				return gax.OnCodes([]codes.Code{
 					codes.Unavailable,
@@ -107,6 +110,7 @@ func defaultKeywordPlanCallOptions() *KeywordPlanCallOptions {
 			}),
 		},
 		GenerateHistoricalMetrics: []gax.CallOption{
+			gax.WithTimeout(14400000 * time.Millisecond),
 			gax.WithRetry(func() gax.Retryer {
 				return gax.OnCodes([]codes.Code{
 					codes.Unavailable,
@@ -263,9 +267,6 @@ type keywordPlanGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
 	// Points back to the CallOptions field of the containing KeywordPlanClient
 	CallOptions **KeywordPlanCallOptions
 
@@ -273,7 +274,7 @@ type keywordPlanGRPCClient struct {
 	keywordPlanClient servicespb.KeywordPlanServiceClient
 
 	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
+	xGoogHeaders []string
 }
 
 // NewKeywordPlanClient creates a new keyword plan service client based on gRPC.
@@ -290,11 +291,6 @@ func NewKeywordPlanClient(ctx context.Context, opts ...option.ClientOption) (*Ke
 		clientOpts = append(clientOpts, hookOpts...)
 	}
 
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
 	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
 	if err != nil {
 		return nil, err
@@ -303,7 +299,6 @@ func NewKeywordPlanClient(ctx context.Context, opts ...option.ClientOption) (*Ke
 
 	c := &keywordPlanGRPCClient{
 		connPool:          connPool,
-		disableDeadlines:  disableDeadlines,
 		keywordPlanClient: servicespb.NewKeywordPlanServiceClient(connPool),
 		CallOptions:       &client.CallOptions,
 	}
@@ -326,9 +321,9 @@ func (c *keywordPlanGRPCClient) Connection() *grpc.ClientConn {
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *keywordPlanGRPCClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv := append([]string{"gl-go", gax.GoVersion}, keyval...)
 	kv = append(kv, "gapic", getVersionClient(), "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.xGoogHeaders = []string{"x-goog-api-client", gax.XGoogHeader(kv...)}
 }
 
 // Close closes the connection to the API service. The user should invoke this when
@@ -338,14 +333,10 @@ func (c *keywordPlanGRPCClient) Close() error {
 }
 
 func (c *keywordPlanGRPCClient) MutateKeywordPlans(ctx context.Context, req *servicespb.MutateKeywordPlansRequest, opts ...gax.CallOption) (*servicespb.MutateKeywordPlansResponse, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+	hds := []string{"x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId()))}
 
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	hds = append(c.xGoogHeaders, hds...)
+	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
 	opts = append((*c.CallOptions).MutateKeywordPlans[0:len((*c.CallOptions).MutateKeywordPlans):len((*c.CallOptions).MutateKeywordPlans)], opts...)
 	var resp *servicespb.MutateKeywordPlansResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -360,14 +351,10 @@ func (c *keywordPlanGRPCClient) MutateKeywordPlans(ctx context.Context, req *ser
 }
 
 func (c *keywordPlanGRPCClient) GenerateForecastCurve(ctx context.Context, req *servicespb.GenerateForecastCurveRequest, opts ...gax.CallOption) (*servicespb.GenerateForecastCurveResponse, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "keyword_plan", url.QueryEscape(req.GetKeywordPlan())))
+	hds := []string{"x-goog-request-params", fmt.Sprintf("%s=%v", "keyword_plan", url.QueryEscape(req.GetKeywordPlan()))}
 
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	hds = append(c.xGoogHeaders, hds...)
+	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
 	opts = append((*c.CallOptions).GenerateForecastCurve[0:len((*c.CallOptions).GenerateForecastCurve):len((*c.CallOptions).GenerateForecastCurve)], opts...)
 	var resp *servicespb.GenerateForecastCurveResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -382,14 +369,10 @@ func (c *keywordPlanGRPCClient) GenerateForecastCurve(ctx context.Context, req *
 }
 
 func (c *keywordPlanGRPCClient) GenerateForecastTimeSeries(ctx context.Context, req *servicespb.GenerateForecastTimeSeriesRequest, opts ...gax.CallOption) (*servicespb.GenerateForecastTimeSeriesResponse, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "keyword_plan", url.QueryEscape(req.GetKeywordPlan())))
+	hds := []string{"x-goog-request-params", fmt.Sprintf("%s=%v", "keyword_plan", url.QueryEscape(req.GetKeywordPlan()))}
 
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	hds = append(c.xGoogHeaders, hds...)
+	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
 	opts = append((*c.CallOptions).GenerateForecastTimeSeries[0:len((*c.CallOptions).GenerateForecastTimeSeries):len((*c.CallOptions).GenerateForecastTimeSeries)], opts...)
 	var resp *servicespb.GenerateForecastTimeSeriesResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -404,14 +387,10 @@ func (c *keywordPlanGRPCClient) GenerateForecastTimeSeries(ctx context.Context, 
 }
 
 func (c *keywordPlanGRPCClient) GenerateForecastMetrics(ctx context.Context, req *servicespb.GenerateForecastMetricsRequest, opts ...gax.CallOption) (*servicespb.GenerateForecastMetricsResponse, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "keyword_plan", url.QueryEscape(req.GetKeywordPlan())))
+	hds := []string{"x-goog-request-params", fmt.Sprintf("%s=%v", "keyword_plan", url.QueryEscape(req.GetKeywordPlan()))}
 
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	hds = append(c.xGoogHeaders, hds...)
+	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
 	opts = append((*c.CallOptions).GenerateForecastMetrics[0:len((*c.CallOptions).GenerateForecastMetrics):len((*c.CallOptions).GenerateForecastMetrics)], opts...)
 	var resp *servicespb.GenerateForecastMetricsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -426,14 +405,10 @@ func (c *keywordPlanGRPCClient) GenerateForecastMetrics(ctx context.Context, req
 }
 
 func (c *keywordPlanGRPCClient) GenerateHistoricalMetrics(ctx context.Context, req *servicespb.GenerateHistoricalMetricsRequest, opts ...gax.CallOption) (*servicespb.GenerateHistoricalMetricsResponse, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "keyword_plan", url.QueryEscape(req.GetKeywordPlan())))
+	hds := []string{"x-goog-request-params", fmt.Sprintf("%s=%v", "keyword_plan", url.QueryEscape(req.GetKeywordPlan()))}
 
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	hds = append(c.xGoogHeaders, hds...)
+	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
 	opts = append((*c.CallOptions).GenerateHistoricalMetrics[0:len((*c.CallOptions).GenerateHistoricalMetrics):len((*c.CallOptions).GenerateHistoricalMetrics)], opts...)
 	var resp *servicespb.GenerateHistoricalMetricsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {

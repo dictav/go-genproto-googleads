@@ -25,6 +25,7 @@ import (
 
 	"cloud.google.com/go/longrunning"
 	lroauto "cloud.google.com/go/longrunning/autogen"
+	longrunningpb "cloud.google.com/go/longrunning/autogen/longrunningpb"
 	gax "github.com/googleapis/gax-go/v2"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -32,10 +33,8 @@ import (
 	gtransport "google.golang.org/api/transport/grpc"
 	resourcespb "github.com/dictav/go-genproto-googleads/pb/v12/resources"
 	servicespb "github.com/dictav/go-genproto-googleads/pb/v12/services"
-	longrunningpb "google.golang.org/genproto/googleapis/longrunning"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -64,6 +63,7 @@ func defaultBatchJobGRPCClientOptions() []option.ClientOption {
 func defaultBatchJobCallOptions() *BatchJobCallOptions {
 	return &BatchJobCallOptions{
 		MutateBatchJob: []gax.CallOption{
+			gax.WithTimeout(14400000 * time.Millisecond),
 			gax.WithRetry(func() gax.Retryer {
 				return gax.OnCodes([]codes.Code{
 					codes.Unavailable,
@@ -76,6 +76,7 @@ func defaultBatchJobCallOptions() *BatchJobCallOptions {
 			}),
 		},
 		ListBatchJobResults: []gax.CallOption{
+			gax.WithTimeout(14400000 * time.Millisecond),
 			gax.WithRetry(func() gax.Retryer {
 				return gax.OnCodes([]codes.Code{
 					codes.Unavailable,
@@ -88,6 +89,7 @@ func defaultBatchJobCallOptions() *BatchJobCallOptions {
 			}),
 		},
 		RunBatchJob: []gax.CallOption{
+			gax.WithTimeout(14400000 * time.Millisecond),
 			gax.WithRetry(func() gax.Retryer {
 				return gax.OnCodes([]codes.Code{
 					codes.Unavailable,
@@ -100,6 +102,7 @@ func defaultBatchJobCallOptions() *BatchJobCallOptions {
 			}),
 		},
 		AddBatchJobOperations: []gax.CallOption{
+			gax.WithTimeout(14400000 * time.Millisecond),
 			gax.WithRetry(func() gax.Retryer {
 				return gax.OnCodes([]codes.Code{
 					codes.Unavailable,
@@ -241,9 +244,6 @@ type batchJobGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
 	// Points back to the CallOptions field of the containing BatchJobClient
 	CallOptions **BatchJobCallOptions
 
@@ -256,7 +256,7 @@ type batchJobGRPCClient struct {
 	LROClient **lroauto.OperationsClient
 
 	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
+	xGoogHeaders []string
 }
 
 // NewBatchJobClient creates a new batch job service client based on gRPC.
@@ -273,11 +273,6 @@ func NewBatchJobClient(ctx context.Context, opts ...option.ClientOption) (*Batch
 		clientOpts = append(clientOpts, hookOpts...)
 	}
 
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
 	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
 	if err != nil {
 		return nil, err
@@ -285,10 +280,9 @@ func NewBatchJobClient(ctx context.Context, opts ...option.ClientOption) (*Batch
 	client := BatchJobClient{CallOptions: defaultBatchJobCallOptions()}
 
 	c := &batchJobGRPCClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		batchJobClient:   servicespb.NewBatchJobServiceClient(connPool),
-		CallOptions:      &client.CallOptions,
+		connPool:       connPool,
+		batchJobClient: servicespb.NewBatchJobServiceClient(connPool),
+		CallOptions:    &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
@@ -320,9 +314,9 @@ func (c *batchJobGRPCClient) Connection() *grpc.ClientConn {
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *batchJobGRPCClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv := append([]string{"gl-go", gax.GoVersion}, keyval...)
 	kv = append(kv, "gapic", getVersionClient(), "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.xGoogHeaders = []string{"x-goog-api-client", gax.XGoogHeader(kv...)}
 }
 
 // Close closes the connection to the API service. The user should invoke this when
@@ -332,14 +326,10 @@ func (c *batchJobGRPCClient) Close() error {
 }
 
 func (c *batchJobGRPCClient) MutateBatchJob(ctx context.Context, req *servicespb.MutateBatchJobRequest, opts ...gax.CallOption) (*servicespb.MutateBatchJobResponse, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+	hds := []string{"x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId()))}
 
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	hds = append(c.xGoogHeaders, hds...)
+	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
 	opts = append((*c.CallOptions).MutateBatchJob[0:len((*c.CallOptions).MutateBatchJob):len((*c.CallOptions).MutateBatchJob)], opts...)
 	var resp *servicespb.MutateBatchJobResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -354,9 +344,10 @@ func (c *batchJobGRPCClient) MutateBatchJob(ctx context.Context, req *servicespb
 }
 
 func (c *batchJobGRPCClient) ListBatchJobResults(ctx context.Context, req *servicespb.ListBatchJobResultsRequest, opts ...gax.CallOption) *BatchJobResultIterator {
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	hds := []string{"x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName()))}
 
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	hds = append(c.xGoogHeaders, hds...)
+	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
 	opts = append((*c.CallOptions).ListBatchJobResults[0:len((*c.CallOptions).ListBatchJobResults):len((*c.CallOptions).ListBatchJobResults)], opts...)
 	it := &BatchJobResultIterator{}
 	req = proto.Clone(req).(*servicespb.ListBatchJobResultsRequest)
@@ -399,14 +390,10 @@ func (c *batchJobGRPCClient) ListBatchJobResults(ctx context.Context, req *servi
 }
 
 func (c *batchJobGRPCClient) RunBatchJob(ctx context.Context, req *servicespb.RunBatchJobRequest, opts ...gax.CallOption) (*RunBatchJobOperation, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	hds := []string{"x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName()))}
 
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	hds = append(c.xGoogHeaders, hds...)
+	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
 	opts = append((*c.CallOptions).RunBatchJob[0:len((*c.CallOptions).RunBatchJob):len((*c.CallOptions).RunBatchJob)], opts...)
 	var resp *longrunningpb.Operation
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
@@ -423,14 +410,10 @@ func (c *batchJobGRPCClient) RunBatchJob(ctx context.Context, req *servicespb.Ru
 }
 
 func (c *batchJobGRPCClient) AddBatchJobOperations(ctx context.Context, req *servicespb.AddBatchJobOperationsRequest, opts ...gax.CallOption) (*servicespb.AddBatchJobOperationsResponse, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	hds := []string{"x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName()))}
 
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	hds = append(c.xGoogHeaders, hds...)
+	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
 	opts = append((*c.CallOptions).AddBatchJobOperations[0:len((*c.CallOptions).AddBatchJobOperations):len((*c.CallOptions).AddBatchJobOperations)], opts...)
 	var resp *servicespb.AddBatchJobOperationsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {

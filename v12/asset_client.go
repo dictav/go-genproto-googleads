@@ -30,7 +30,6 @@ import (
 	servicespb "github.com/dictav/go-genproto-googleads/pb/v12/services"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 )
 
 var newAssetClientHook clientHook
@@ -55,6 +54,7 @@ func defaultAssetGRPCClientOptions() []option.ClientOption {
 func defaultAssetCallOptions() *AssetCallOptions {
 	return &AssetCallOptions{
 		MutateAssets: []gax.CallOption{
+			gax.WithTimeout(14400000 * time.Millisecond),
 			gax.WithRetry(func() gax.Retryer {
 				return gax.OnCodes([]codes.Code{
 					codes.Unavailable,
@@ -155,9 +155,6 @@ type assetGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
 	// Points back to the CallOptions field of the containing AssetClient
 	CallOptions **AssetCallOptions
 
@@ -165,7 +162,7 @@ type assetGRPCClient struct {
 	assetClient servicespb.AssetServiceClient
 
 	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
+	xGoogHeaders []string
 }
 
 // NewAssetClient creates a new asset service client based on gRPC.
@@ -184,11 +181,6 @@ func NewAssetClient(ctx context.Context, opts ...option.ClientOption) (*AssetCli
 		clientOpts = append(clientOpts, hookOpts...)
 	}
 
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
 	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
 	if err != nil {
 		return nil, err
@@ -196,10 +188,9 @@ func NewAssetClient(ctx context.Context, opts ...option.ClientOption) (*AssetCli
 	client := AssetClient{CallOptions: defaultAssetCallOptions()}
 
 	c := &assetGRPCClient{
-		connPool:         connPool,
-		disableDeadlines: disableDeadlines,
-		assetClient:      servicespb.NewAssetServiceClient(connPool),
-		CallOptions:      &client.CallOptions,
+		connPool:    connPool,
+		assetClient: servicespb.NewAssetServiceClient(connPool),
+		CallOptions: &client.CallOptions,
 	}
 	c.setGoogleClientInfo()
 
@@ -220,9 +211,9 @@ func (c *assetGRPCClient) Connection() *grpc.ClientConn {
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *assetGRPCClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv := append([]string{"gl-go", gax.GoVersion}, keyval...)
 	kv = append(kv, "gapic", getVersionClient(), "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.xGoogHeaders = []string{"x-goog-api-client", gax.XGoogHeader(kv...)}
 }
 
 // Close closes the connection to the API service. The user should invoke this when
@@ -232,14 +223,10 @@ func (c *assetGRPCClient) Close() error {
 }
 
 func (c *assetGRPCClient) MutateAssets(ctx context.Context, req *servicespb.MutateAssetsRequest, opts ...gax.CallOption) (*servicespb.MutateAssetsResponse, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+	hds := []string{"x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId()))}
 
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	hds = append(c.xGoogHeaders, hds...)
+	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
 	opts = append((*c.CallOptions).MutateAssets[0:len((*c.CallOptions).MutateAssets):len((*c.CallOptions).MutateAssets)], opts...)
 	var resp *servicespb.MutateAssetsResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {

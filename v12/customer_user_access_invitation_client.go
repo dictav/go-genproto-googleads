@@ -30,7 +30,6 @@ import (
 	servicespb "github.com/dictav/go-genproto-googleads/pb/v12/services"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 )
 
 var newCustomerUserAccessInvitationClientHook clientHook
@@ -55,6 +54,7 @@ func defaultCustomerUserAccessInvitationGRPCClientOptions() []option.ClientOptio
 func defaultCustomerUserAccessInvitationCallOptions() *CustomerUserAccessInvitationCallOptions {
 	return &CustomerUserAccessInvitationCallOptions{
 		MutateCustomerUserAccessInvitation: []gax.CallOption{
+			gax.WithTimeout(14400000 * time.Millisecond),
 			gax.WithRetry(func() gax.Retryer {
 				return gax.OnCodes([]codes.Code{
 					codes.Unavailable,
@@ -134,9 +134,6 @@ type customerUserAccessInvitationGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
 	// Points back to the CallOptions field of the containing CustomerUserAccessInvitationClient
 	CallOptions **CustomerUserAccessInvitationCallOptions
 
@@ -144,7 +141,7 @@ type customerUserAccessInvitationGRPCClient struct {
 	customerUserAccessInvitationClient servicespb.CustomerUserAccessInvitationServiceClient
 
 	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
+	xGoogHeaders []string
 }
 
 // NewCustomerUserAccessInvitationClient creates a new customer user access invitation service client based on gRPC.
@@ -162,11 +159,6 @@ func NewCustomerUserAccessInvitationClient(ctx context.Context, opts ...option.C
 		clientOpts = append(clientOpts, hookOpts...)
 	}
 
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
 	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
 	if err != nil {
 		return nil, err
@@ -175,7 +167,6 @@ func NewCustomerUserAccessInvitationClient(ctx context.Context, opts ...option.C
 
 	c := &customerUserAccessInvitationGRPCClient{
 		connPool:                           connPool,
-		disableDeadlines:                   disableDeadlines,
 		customerUserAccessInvitationClient: servicespb.NewCustomerUserAccessInvitationServiceClient(connPool),
 		CallOptions:                        &client.CallOptions,
 	}
@@ -198,9 +189,9 @@ func (c *customerUserAccessInvitationGRPCClient) Connection() *grpc.ClientConn {
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *customerUserAccessInvitationGRPCClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv := append([]string{"gl-go", gax.GoVersion}, keyval...)
 	kv = append(kv, "gapic", getVersionClient(), "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.xGoogHeaders = []string{"x-goog-api-client", gax.XGoogHeader(kv...)}
 }
 
 // Close closes the connection to the API service. The user should invoke this when
@@ -210,14 +201,10 @@ func (c *customerUserAccessInvitationGRPCClient) Close() error {
 }
 
 func (c *customerUserAccessInvitationGRPCClient) MutateCustomerUserAccessInvitation(ctx context.Context, req *servicespb.MutateCustomerUserAccessInvitationRequest, opts ...gax.CallOption) (*servicespb.MutateCustomerUserAccessInvitationResponse, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId())))
+	hds := []string{"x-goog-request-params", fmt.Sprintf("%s=%v", "customer_id", url.QueryEscape(req.GetCustomerId()))}
 
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	hds = append(c.xGoogHeaders, hds...)
+	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
 	opts = append((*c.CallOptions).MutateCustomerUserAccessInvitation[0:len((*c.CallOptions).MutateCustomerUserAccessInvitation):len((*c.CallOptions).MutateCustomerUserAccessInvitation)], opts...)
 	var resp *servicespb.MutateCustomerUserAccessInvitationResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {

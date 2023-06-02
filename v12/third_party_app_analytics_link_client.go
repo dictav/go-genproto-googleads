@@ -30,7 +30,6 @@ import (
 	servicespb "github.com/dictav/go-genproto-googleads/pb/v12/services"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 )
 
 var newThirdPartyAppAnalyticsLinkClientHook clientHook
@@ -55,6 +54,7 @@ func defaultThirdPartyAppAnalyticsLinkGRPCClientOptions() []option.ClientOption 
 func defaultThirdPartyAppAnalyticsLinkCallOptions() *ThirdPartyAppAnalyticsLinkCallOptions {
 	return &ThirdPartyAppAnalyticsLinkCallOptions{
 		RegenerateShareableLinkId: []gax.CallOption{
+			gax.WithTimeout(14400000 * time.Millisecond),
 			gax.WithRetry(func() gax.Retryer {
 				return gax.OnCodes([]codes.Code{
 					codes.Unavailable,
@@ -134,9 +134,6 @@ type thirdPartyAppAnalyticsLinkGRPCClient struct {
 	// Connection pool of gRPC connections to the service.
 	connPool gtransport.ConnPool
 
-	// flag to opt out of default deadlines via GOOGLE_API_GO_EXPERIMENTAL_DISABLE_DEFAULT_DEADLINE
-	disableDeadlines bool
-
 	// Points back to the CallOptions field of the containing ThirdPartyAppAnalyticsLinkClient
 	CallOptions **ThirdPartyAppAnalyticsLinkCallOptions
 
@@ -144,7 +141,7 @@ type thirdPartyAppAnalyticsLinkGRPCClient struct {
 	thirdPartyAppAnalyticsLinkClient servicespb.ThirdPartyAppAnalyticsLinkServiceClient
 
 	// The x-goog-* metadata to be sent with each request.
-	xGoogMetadata metadata.MD
+	xGoogHeaders []string
 }
 
 // NewThirdPartyAppAnalyticsLinkClient creates a new third party app analytics link service client based on gRPC.
@@ -162,11 +159,6 @@ func NewThirdPartyAppAnalyticsLinkClient(ctx context.Context, opts ...option.Cli
 		clientOpts = append(clientOpts, hookOpts...)
 	}
 
-	disableDeadlines, err := checkDisableDeadlines()
-	if err != nil {
-		return nil, err
-	}
-
 	connPool, err := gtransport.DialPool(ctx, append(clientOpts, opts...)...)
 	if err != nil {
 		return nil, err
@@ -175,7 +167,6 @@ func NewThirdPartyAppAnalyticsLinkClient(ctx context.Context, opts ...option.Cli
 
 	c := &thirdPartyAppAnalyticsLinkGRPCClient{
 		connPool:                         connPool,
-		disableDeadlines:                 disableDeadlines,
 		thirdPartyAppAnalyticsLinkClient: servicespb.NewThirdPartyAppAnalyticsLinkServiceClient(connPool),
 		CallOptions:                      &client.CallOptions,
 	}
@@ -198,9 +189,9 @@ func (c *thirdPartyAppAnalyticsLinkGRPCClient) Connection() *grpc.ClientConn {
 // the `x-goog-api-client` header passed on each request. Intended for
 // use by Google-written clients.
 func (c *thirdPartyAppAnalyticsLinkGRPCClient) setGoogleClientInfo(keyval ...string) {
-	kv := append([]string{"gl-go", versionGo()}, keyval...)
+	kv := append([]string{"gl-go", gax.GoVersion}, keyval...)
 	kv = append(kv, "gapic", getVersionClient(), "gax", gax.Version, "grpc", grpc.Version)
-	c.xGoogMetadata = metadata.Pairs("x-goog-api-client", gax.XGoogHeader(kv...))
+	c.xGoogHeaders = []string{"x-goog-api-client", gax.XGoogHeader(kv...)}
 }
 
 // Close closes the connection to the API service. The user should invoke this when
@@ -210,14 +201,10 @@ func (c *thirdPartyAppAnalyticsLinkGRPCClient) Close() error {
 }
 
 func (c *thirdPartyAppAnalyticsLinkGRPCClient) RegenerateShareableLinkId(ctx context.Context, req *servicespb.RegenerateShareableLinkIdRequest, opts ...gax.CallOption) (*servicespb.RegenerateShareableLinkIdResponse, error) {
-	if _, ok := ctx.Deadline(); !ok && !c.disableDeadlines {
-		cctx, cancel := context.WithTimeout(ctx, 14400000*time.Millisecond)
-		defer cancel()
-		ctx = cctx
-	}
-	md := metadata.Pairs("x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName())))
+	hds := []string{"x-goog-request-params", fmt.Sprintf("%s=%v", "resource_name", url.QueryEscape(req.GetResourceName()))}
 
-	ctx = insertMetadata(ctx, c.xGoogMetadata, md)
+	hds = append(c.xGoogHeaders, hds...)
+	ctx = gax.InsertMetadataIntoOutgoingContext(ctx, hds...)
 	opts = append((*c.CallOptions).RegenerateShareableLinkId[0:len((*c.CallOptions).RegenerateShareableLinkId):len((*c.CallOptions).RegenerateShareableLinkId)], opts...)
 	var resp *servicespb.RegenerateShareableLinkIdResponse
 	err := gax.Invoke(ctx, func(ctx context.Context, settings gax.CallSettings) error {
