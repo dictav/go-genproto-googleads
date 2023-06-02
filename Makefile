@@ -1,7 +1,7 @@
 PKG := github.com/dictav/go-genproto-googleads
 GOOGLE_PROTO := google.golang.org/genproto/googleapis/ads/googleads
 
-TARGETS := v10 v11 v12
+TARGETS := v12 v13
 SRC := googleapis/bazel-bin/google/ads/googleads/$(VERSION)/gapi-ads-googleads-$(VERSION)-go.tar.gz
 
 all: $(TARGETS)
@@ -27,7 +27,7 @@ build: $(SRC)
 $(SRC): googleapis
 	cd googleapis; git reset --hard
 	./googleads-go.patch.sh $(PKG) $(VERSION)
-	cd googleapis; bazel build //google/ads/googleads/$(VERSION):gapi-ads-googleads-$(VERSION)-go
+	cd googleapis; bazel build --cxxopt=-std=c++14 --host_cxxopt=-std=c++14 //google/ads/googleads/$(VERSION):gapi-ads-googleads-$(VERSION)-go
 
 googleapis:
 	git clone --depth=1 https://github.com/googleapis/googleapis
